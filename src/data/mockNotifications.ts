@@ -1,0 +1,128 @@
+import { SystemNotification } from '../types';
+
+export const INITIAL_NOTIFICATIONS: SystemNotification[] = [
+  {
+    id: 'notif-1',
+    title: "Nouvelle demande d'inscription d'établissement",
+    message: "Le Complexe Scolaire Denis Sassou Nguesso (Brazzaville, Ouenze) vient de soumettre son dossier d'agrément et sa demande d'accès.",
+    timestamp: "Il y a 3 min",
+    category: 'registration',
+    read: false,
+    priority: 'urgent',
+    schoolName: "Complexe Scolaire Denis Sassou Nguesso",
+    department: "Brazzaville",
+    city: "Brazzaville",
+    schoolCode: "BZV-24-DSN",
+    contactPhone: "+242 06 651 88 99",
+    contactEmail: "secretariat@cs-dsn-bzv.cg",
+    actionLabel: "Examiner le dossier",
+  },
+  {
+    id: 'notif-2',
+    title: "Circulaire MEPPSA n° 2024-11/CAB",
+    message: "Ouverture des inscriptions aux examens d'État session 2025 (BEPC & Baccalauréat Général / Technique). Clôture fixée au 15 décembre.",
+    timestamp: "Il y a 25 min",
+    category: 'meppsa',
+    read: false,
+    priority: 'high',
+    actionLabel: "Consulter la circulaire",
+  },
+  {
+    id: 'notif-3',
+    title: "Paiement MTN Mobile Money validé",
+    message: "Versement de 65 000 FCFA reçu pour les frais d'inscription de l'élève MOUKOKO Grace (Terminale C). Réf: MTN-CG-8839210.",
+    timestamp: "Il y a 1 heure",
+    category: 'payment',
+    read: false,
+    priority: 'normal',
+    amount: "65 000 FCFA",
+    actionLabel: "Voir le reçu de caisse",
+  },
+  {
+    id: 'notif-4',
+    title: "Nouvelle inscription : Lycée d'Oyo",
+    message: "Dossier administratif complété avec l'Arrêté ministériel d'agrément joint pour la région de la Cuvette.",
+    timestamp: "Il y a 3 heures",
+    category: 'registration',
+    read: true,
+    priority: 'normal',
+    schoolName: "Lycée d'Excellence d'Oyo",
+    department: "Cuvette",
+    city: "Oyo",
+    schoolCode: "CUV-24-OYO",
+    contactPhone: "+242 05 520 11 22",
+    contactEmail: "direction@lycee-oyo.cg",
+    actionLabel: "Consulter l'agrément",
+  },
+  {
+    id: 'notif-5',
+    title: "Synchronisation Cloud Nationale Réussie",
+    message: "Sauvegarde miroir effectuée pour 48 établissements scolaires connectés à travers les 12 départements du Congo.",
+    timestamp: "Aujourd'hui, 08:30",
+    category: 'system',
+    read: true,
+    priority: 'normal',
+  },
+];
+
+export const NOTIFICATION_TEMPLATES: Array<Omit<SystemNotification, 'id' | 'timestamp' | 'read'>> = [
+  {
+    title: "Nouvelle demande : Institut Technique de Pointe-Noire",
+    message: "Le Directeur des études a soumis une demande d'ouverture de filière Génie Civil avec 120 élèves pré-enregistrés.",
+    category: 'registration',
+    priority: 'high',
+    schoolName: "Institut Polytechnique du Littoral",
+    department: "Pointe-Noire",
+    city: "Pointe-Noire",
+    schoolCode: "PNR-24-IPL",
+    contactPhone: "+242 06 440 99 12",
+    contactEmail: "admin@ipl-pointenoire.cg",
+    actionLabel: "Valider l'établissement",
+  },
+  {
+    title: "Paiement Airtel Money reçu (+242 05 500 44 33)",
+    message: "Paiement de scolarité Trimestre 1 d'un montant de 45 000 FCFA confirmé pour NGANGA Brice (3ème B).",
+    category: 'payment',
+    priority: 'normal',
+    amount: "45 000 FCFA",
+    actionLabel: "Télécharger récépissé",
+  },
+  {
+    title: "Inspection Pédagogique - DDEPSA Pool",
+    message: "Avis de passage de l'Inspecteur de zone pour contrôle des registres de notes et émargements à Kinkala.",
+    category: 'meppsa',
+    priority: 'urgent',
+    department: "Pool",
+    city: "Kinkala",
+    actionLabel: "Détails de la mission",
+  },
+  {
+    title: "Nouvelle demande : École Privée Les Papillons (Dolisie)",
+    message: "Nouvel établissement primaire demandant son rattachement à la DDEPSA Niari.",
+    category: 'registration',
+    priority: 'normal',
+    schoolName: "École Primaire Privée Les Papillons",
+    department: "Niari",
+    city: "Dolisie",
+    schoolCode: "NIA-24-PAP",
+    contactPhone: "+242 06 912 34 56",
+    contactEmail: "ecole.papillons@dolisie.cg",
+    actionLabel: "Inspecter la demande",
+  },
+  {
+    title: "Alerte de Sécurité et Protection des Données",
+    message: "Mise à jour des protocoles de chiffrement pour les relevés de notes et bulletins conformes à la réglementation nationale.",
+    category: 'system',
+    priority: 'normal',
+  }
+];
+
+export function generateRandomNotification(): SystemNotification {
+  const template = NOTIFICATION_TEMPLATES[Math.floor(Math.random() * NOTIFICATION_TEMPLATES.length)];
+  return {
+    ...template,
+    id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    timestamp: "À l'instant",
+    read: false,
+  };
+}

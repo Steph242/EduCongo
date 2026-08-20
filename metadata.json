@@ -1,0 +1,6 @@
+{
+  "name": "EduCongo - Système de Gestion Scolaire",
+  "description": "Plateforme moderne de gestion scolaire et administrative pour les établissements d'excellence en République du Congo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
