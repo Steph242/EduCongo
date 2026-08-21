@@ -44,14 +44,15 @@ export const SchoolSubdomainView: React.FC<SchoolSubdomainViewProps> = ({
           <button
             type="button"
             onClick={onBackToMainPortal}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+            title="Retour au portail principal ou tableau de bord"
+            className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-[0_0_15px_rgba(16,185,129,0.15)] group active:scale-95"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            <span className="hidden sm:inline">Portail National EduCongo</span>
+            <span className="material-symbols-outlined text-[18px] group-hover:-translate-x-0.5 transition-transform text-emerald-400">arrow_back</span>
+            <span>Retour au Portail National</span>
           </button>
 
           {/* Browser-style address pill */}
-          <div className="flex items-center gap-2 bg-black/50 border border-emerald-500/30 px-3 py-1 rounded-xl font-mono text-xs text-emerald-400 shadow-inner">
+          <div className="hidden sm:flex items-center gap-2 bg-black/50 border border-emerald-500/30 px-3 py-1 rounded-xl font-mono text-xs text-emerald-400 shadow-inner">
             <span className="material-symbols-outlined text-[15px] text-emerald-400">lock</span>
             <span className="text-slate-400">https://</span>
             <strong className="text-emerald-300 font-bold">{fullDomain}</strong>

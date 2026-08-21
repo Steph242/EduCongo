@@ -1,4 +1,4 @@
-export type AuthViewMode = 'login' | 'register_step1' | 'register_step2' | 'register_step3' | 'register_success' | 'portal_access';
+export type AuthViewMode = 'login' | 'register_step1' | 'register_step2' | 'register_step3' | 'verify_email' | 'register_success' | 'portal_access';
 
 export type AppScreen = 'auth' | 'dashboard' | 'about' | 'help' | 'subdomain_portal' | 'dev_panel';
 
@@ -334,5 +334,22 @@ export interface NationalEducationStats {
   averageNationalAttendance: number;
   departmentsCovered: number;
 }
+
+export interface DeveloperAccount {
+  id: string;
+  fullName: string;
+  email: string;
+  password?: string;
+  role: string;
+  department?: string;
+  phone?: string;
+  securityKey?: string;
+  isEmailVerified: boolean;
+  createdAt: string;
+  avatarUrl?: string;
+  lastLoginAt?: string;
+  isCustom?: boolean;
+}
+
 
 

@@ -6,7 +6,8 @@ import { saveRegisteredAccount } from '../../services/accountService';
 interface RegisterStep3Props {
   formData: SchoolRegistrationData;
   onChange: (field: keyof SchoolRegistrationData, value: any) => void;
-  onSubmit: () => void;
+  onSubmit: () => Promise<void> | void;
+  onRegisterWithSupabase?: (formData: SchoolRegistrationData) => Promise<{ success: boolean; error?: string }>;
   onBack: () => void;
   onSwitchToLogin: () => void;
 }
@@ -15,11 +16,13 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({
   formData,
   onChange,
   onSubmit,
+  onRegisterWithSupabase,
   onBack,
   onSwitchToLogin,
 }) => {
   const { isOnline } = useNetworkStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleRealFileUpload = (
     docKey: 'agrementFile' | 'statutsFile' | 'identityFile',
@@ -43,19 +46,33 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({
     onChange('documents', updatedDocs);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isOnline) {
       return;
     }
+    setErrorMsg('');
     setIsSubmitting(true);
-    // Persist real registered school account
-    saveRegisteredAccount(formData);
 
-    setTimeout(() => {
+    try {
+      if (onRegisterWithSupabase) {
+        const res = await onRegisterWithSupabase(formData);
+        setIsSubmitting(false);
+        if (!res.success) {
+          setErrorMsg(res.error || "Erreur lors de l'enregistrement du compte.");
+          return;
+        }
+        return;
+      }
+
+      // Persist real registered school account
+      saveRegisteredAccount(formData);
+      await onSubmit();
       setIsSubmitting(false);
-      onSubmit();
-    }, 800);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMsg(err.message || "Erreur lors de l'enregistrement.");
+    }
   };
 
   return (
@@ -112,6 +129,14 @@ export const RegisterStep3: React.FC<RegisterStep3Props> = ({
               Vos documents et paramètres sont enregistrés en local. La transmission au serveur MEPPSA reprendra dès le rétablissement du réseau.
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Error Alert */}
+      {errorMsg && (
+        <div className="mb-4 p-3 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-xs text-rose-200 flex items-center gap-2.5 backdrop-blur-md animate-in fade-in">
+          <span className="material-symbols-outlined text-rose-400 text-[20px] shrink-0">error</span>
+          <span className="text-xs text-rose-200">{errorMsg}</span>
         </div>
       )}
 

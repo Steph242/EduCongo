@@ -14,7 +14,10 @@ import {
 import { AttendanceChart } from './AttendanceChart';
 import { StaffAccountManager } from './StaffAccountManager';
 import { StudentIdCardModal } from './StudentIdCardModal';
+import { TeacherWorkspace } from './TeacherWorkspace';
+import { StudentWorkspace } from './StudentWorkspace';
 import { SchoolSocialFeed } from '../Social/SchoolSocialFeed';
+import { getSchoolData, saveSchoolData } from '../../services/accountService';
 import {
   exportSingleStudentBulletinCSV,
   exportClassGradeSheetCSV,
@@ -60,9 +63,54 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
   externalSelectedStudent,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(externalSelectedTab || 'overview');
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
-  const [teachers] = useState<Teacher[]>(INITIAL_TEACHERS);
-  const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_PAYMENTS);
+  const [tabHistory, setTabHistory] = useState<TabType[]>([]);
+  const [activeRole, setActiveRole] = useState<'admin' | 'enseignant' | 'comptable' | 'secretaire' | 'eleve'>('admin');
+  const [students, setStudents] = useState<Student[]>(() => {
+    const data = getSchoolData(schoolCode);
+    return data.students || [];
+  });
+  const [teachers, setTeachers] = useState<Teacher[]>(() => {
+    const data = getSchoolData(schoolCode);
+    return data.teachers || [];
+  });
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
+    const data = getSchoolData(schoolCode);
+    return data.payments || [];
+  });
+
+  // Sync when schoolCode changes
+  useEffect(() => {
+    const data = getSchoolData(schoolCode);
+    setStudents(data.students || []);
+    setTeachers(data.teachers || []);
+    setPayments(data.payments || []);
+  }, [schoolCode]);
+
+  const persistSchoolData = (newStudents: Student[], newTeachers: Teacher[], newPayments: PaymentRecord[]) => {
+    saveSchoolData(schoolCode, {
+      students: newStudents,
+      teachers: newTeachers,
+      payments: newPayments,
+      isNewlyCreated: false,
+    });
+  };
+
+  // Robust tab navigation with history tracking
+  const navigateToTab = (newTab: TabType) => {
+    if (newTab === activeTab) return;
+    setTabHistory((prev) => [...prev.filter((t) => t !== newTab), activeTab]);
+    setActiveTab(newTab);
+  };
+
+  const handleGoBack = () => {
+    if (tabHistory.length > 0) {
+      const previous = tabHistory[tabHistory.length - 1];
+      setTabHistory((prev) => prev.slice(0, -1));
+      setActiveTab(previous);
+    } else if (activeTab !== 'overview') {
+      setActiveTab('overview');
+    }
+  };
 
   // Student filter and search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -171,7 +219,9 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
       averageGrade: 14.5,
     };
 
-    setStudents([created, ...students]);
+    const updatedStudents = [created, ...students];
+    setStudents(updatedStudents);
+    persistSchoolData(updatedStudents, teachers, payments);
     setIsAddStudentOpen(false);
     showToast(`✅ ${newStudent.studentType === 'etudiant' ? 'Étudiant' : 'Élève'} ${created.firstName} ${created.lastName} enregistré avec succès !`);
     
@@ -200,14 +250,15 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
       status: 'Validé',
     };
 
-    setPayments([createdPayment, ...payments]);
-    setStudents(
-      students.map((s) =>
-        s.matricule === st.matricule
-          ? { ...s, tuitionPaid: Math.min(s.tuitionTotal, s.tuitionPaid + Number(newPayment.amount)) }
-          : s
-      )
+    const updatedPayments = [createdPayment, ...payments];
+    const updatedStudents = students.map((s) =>
+      s.matricule === st.matricule
+        ? { ...s, tuitionPaid: Math.min(s.tuitionTotal, s.tuitionPaid + Number(newPayment.amount)) }
+        : s
     );
+    setPayments(updatedPayments);
+    setStudents(updatedStudents);
+    persistSchoolData(updatedStudents, teachers, updatedPayments);
     setIsNewPaymentOpen(false);
     showToast(`Paiement de ${newPayment.amount.toLocaleString('fr-FR')} FCFA validé !`);
   };
@@ -711,7 +762,10 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     },
   ];
 
+  const currentGroup = NAVIGATION_MODULES.find((g) => g.items.some((item) => item.id === activeTab)) || NAVIGATION_MODULES[0];
   const currentModule = NAVIGATION_MODULES.flatMap((g) => g.items).find((item) => item.id === activeTab) || NAVIGATION_MODULES[0].items[0];
+  const previousTabId = tabHistory.length > 0 ? tabHistory[tabHistory.length - 1] : (activeTab !== 'overview' ? 'overview' : null);
+  const previousModule = previousTabId ? NAVIGATION_MODULES.flatMap((g) => g.items).find((item) => item.id === previousTabId) : null;
 
   return (
     <div className="min-h-screen text-slate-100 flex flex-col">
@@ -815,7 +869,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => setActiveTab(item.id)}
+                            onClick={() => navigateToTab(item.id)}
                             title={`${item.label} - ${item.desc}`}
                             className={`w-full text-left p-2 sm:p-2.5 rounded-xl flex items-center justify-between text-xs font-semibold transition-all cursor-pointer group relative ${
                               isActive
@@ -930,9 +984,79 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
         {/* ======================================================== */}
         <main className="flex-1 min-w-0 space-y-5">
           
-          {/* Executive Header Banner for Currently Active Module */}
-          <div className="bg-white/[0.04] backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          {/* Executive Header Banner with Breadcrumbs & Back Navigation */}
+          <div className="bg-white/[0.04] backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] space-y-3.5">
+            
+            {/* Top Navigation & Interactive Breadcrumbs Bar */}
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
+              {/* Back button & Breadcrumbs */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                {/* Back button */}
+                {(activeTab !== 'overview' || tabHistory.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={handleGoBack}
+                    title={previousModule ? `Retour à : ${previousModule.label}` : 'Retour au tableau de bord'}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.15)] group"
+                  >
+                    <span className="material-symbols-outlined text-[18px] group-hover:-translate-x-0.5 transition-transform text-emerald-400">
+                      arrow_back
+                    </span>
+                    <span>Retour {previousModule ? `(${previousModule.shortLabel || previousModule.label})` : 'au menu'}</span>
+                  </button>
+                )}
+
+                {/* Interactive Breadcrumbs Trail */}
+                <nav className="flex items-center gap-1.5 text-xs font-medium text-slate-400" aria-label="Fil d'Ariane">
+                  <button
+                    type="button"
+                    onClick={() => navigateToTab('overview')}
+                    className={`flex items-center gap-1 hover:text-emerald-300 transition-colors cursor-pointer ${
+                      activeTab === 'overview' ? 'text-white font-bold' : 'text-slate-400'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-emerald-400">home</span>
+                    <span>Tableau de bord</span>
+                  </button>
+
+                  {activeTab !== 'overview' && (
+                    <>
+                      <span className="text-slate-600">/</span>
+                      <span className="text-slate-400 hidden sm:inline">{currentGroup.group}</span>
+                      <span className="text-slate-600 hidden sm:inline">/</span>
+                      <span className="text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                        {currentModule.label}
+                      </span>
+                    </>
+                  )}
+                </nav>
+              </div>
+
+              {/* History Quick Links if multiple tabs visited */}
+              {tabHistory.length > 1 && (
+                <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Consultés :</span>
+                  {tabHistory.slice(-2).map((histTab) => {
+                    const mod = NAVIGATION_MODULES.flatMap((g) => g.items).find((m) => m.id === histTab);
+                    if (!mod) return null;
+                    return (
+                      <button
+                        key={histTab}
+                        type="button"
+                        onClick={() => navigateToTab(histTab)}
+                        className="px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[12px] text-emerald-400">{mod.icon}</span>
+                        {mod.shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Title & Quick Actions Row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 pt-0.5">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] shrink-0">
                   <span className="material-symbols-outlined text-[26px]">{currentModule.icon}</span>
@@ -941,7 +1065,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                   <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
                     <span>EduCongo</span>
                     <span>/</span>
-                    <span className="text-emerald-400 font-semibold">{currentModule.label}</span>
+                    <span className="text-emerald-400 font-semibold">{currentGroup.group}</span>
                   </div>
                   <h2 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">
                     {currentModule.label}
@@ -969,7 +1093,123 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Profile / Role Selector Bar (RBAC System - Requirement 5) */}
+            <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-400 text-[18px]">account_circle</span>
+                <span className="text-xs font-bold text-slate-300">Profil Actif :</span>
+                <span className="text-[11px] text-slate-400 hidden sm:inline">(Simuler l'interface selon le profil)</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
+                {[
+                  { id: 'admin', label: 'Proviseur / Admin', icon: 'shield_person' },
+                  { id: 'enseignant', label: 'Enseignant', icon: 'cast_for_education' },
+                  { id: 'comptable', label: 'Comptable (Caisse)', icon: 'payments' },
+                  { id: 'secretaire', label: 'Secrétariat', icon: 'badge' },
+                  { id: 'eleve', label: 'Élève / Étudiant', icon: 'school' },
+                ].map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveRole(r.id as any);
+                      if (r.id === 'comptable') navigateToTab('finance');
+                      if (r.id === 'secretaire') navigateToTab('students');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeRole === r.id
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] border border-emerald-400/40'
+                        : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">{r.icon}</span>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
+        {/* ==================== ROLE-SPECIFIC WORKSPACES ==================== */}
+        {activeRole === 'enseignant' ? (
+          <TeacherWorkspace
+            schoolName={schoolName}
+            schoolCode={schoolCode}
+            cityName={city}
+            students={students}
+          />
+        ) : activeRole === 'eleve' ? (
+          <StudentWorkspace
+            schoolName={schoolName}
+            schoolCode={schoolCode}
+            cityName={city}
+            student={students[0] || {
+              id: 'STU-001',
+              matricule: 'CG-2024-001',
+              firstName: 'Élève',
+              lastName: 'Inscrit',
+              gender: 'M',
+              classroom: 'Terminale D',
+              birthDate: '2006-04-12',
+              birthPlace: city || 'Brazzaville',
+              parentName: 'Parent / Tuteur Légal',
+              parentPhone: '06 650 00 00',
+              photoUrl: STUDENT_PHOTO_PRESETS[0].url,
+              email: 'eleve@educongo.cg',
+              bloodGroup: 'O+',
+              address: city || 'Brazzaville',
+              status: 'Inscrit',
+              tuitionPaid: 0,
+              tuitionTotal: 150000,
+              averageGrade: 15.5,
+            }}
+          />
+        ) : (
+          <>
+          {/* Empty School State Banner if no students registered yet (Requirement 3) */}
+          {students.length === 0 && activeTab === 'overview' && (
+            <div className="p-8 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-indigo-950/40 border border-emerald-500/30 backdrop-blur-2xl text-center space-y-6 animate-in fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                <span className="material-symbols-outlined text-[36px]">rocket_launch</span>
+              </div>
+              <div className="max-w-xl mx-auto space-y-2">
+                <h3 className="text-2xl font-black text-white tracking-tight">
+                  Bienvenue dans l'espace de gestion de {schoolName}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300">
+                  Ce compte d'établissement a été créé avec succès et est actuellement <strong>vierge de données</strong>. En tant qu'administrateur, vous pouvez configurer l'ensemble des modules selon l'organisation de votre école.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">1</div>
+                  <h4 className="text-sm font-bold text-white">Inscrire des élèves</h4>
+                  <p className="text-[11px] text-slate-400">Enregistrez vos effectifs avec génération automatique de matricule et carte QR.</p>
+                  <button onClick={() => setIsAddStudentOpen(true)} className="text-xs text-emerald-400 font-bold hover:underline flex items-center gap-1 cursor-pointer">+ Inscrire un élève</button>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">2</div>
+                  <h4 className="text-sm font-bold text-white">Personnel & Profs</h4>
+                  <p className="text-[11px] text-slate-400">Ajoutez les enseignants titulaires et attribuez les accès aux carnets de notes.</p>
+                  <button onClick={() => navigateToTab('staff')} className="text-xs text-indigo-400 font-bold hover:underline flex items-center gap-1 cursor-pointer">Gérer le personnel</button>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">3</div>
+                  <h4 className="text-sm font-bold text-white">Grille d'Écolage</h4>
+                  <p className="text-[11px] text-slate-400">Enregistrez les versements MTN Mobile Money, Airtel Money ou espèces.</p>
+                  <button onClick={() => setIsNewPaymentOpen(true)} className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer">+ Encaisser</button>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-xs">4</div>
+                  <h4 className="text-sm font-bold text-white">Vie Scolaire & Fil</h4>
+                  <p className="text-[11px] text-slate-400">Publiez des annonces officielles, sondages et consignes pour votre communauté.</p>
+                  <button onClick={() => navigateToTab('social')} className="text-xs text-teal-400 font-bold hover:underline flex items-center gap-1 cursor-pointer">Fil d'actualité</button>
+                </div>
+              </div>
+            </div>
+          )}
           
         {/* ==================== TAB: OVERVIEW ==================== */}
         {activeTab === 'overview' && (
@@ -1052,10 +1292,11 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('students')}
-                    className="text-xs text-emerald-400 font-semibold hover:underline cursor-pointer"
+                    onClick={() => navigateToTab('students')}
+                    className="text-xs text-emerald-400 font-semibold hover:underline cursor-pointer flex items-center gap-1"
                   >
-                    Voir tout ({students.length})
+                    <span>Voir tout ({students.length})</span>
+                    <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </button>
                 </div>
 
@@ -1547,7 +1788,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                             type="button"
                             onClick={() => {
                               setSelectedStudentForBulletin(st);
-                              setActiveTab('bulletins');
+                              navigateToTab('bulletins');
                             }}
                             className="flex-1 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer border border-white/10"
                           >
@@ -1559,7 +1800,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                             type="button"
                             onClick={() => {
                               setSelectedStudentForBulletin(st);
-                              setActiveTab('certificates');
+                              navigateToTab('certificates');
                             }}
                             className="flex-1 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer border border-white/10"
                           >
@@ -1657,7 +1898,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                             type="button"
                             onClick={() => {
                               setSelectedStudentForBulletin(st);
-                              setActiveTab('bulletins');
+                              navigateToTab('bulletins');
                             }}
                             title="Voir le Bulletin Officiel"
                             className="p-1.5 text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/15 rounded-lg transition-colors cursor-pointer"
@@ -1668,7 +1909,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                             type="button"
                             onClick={() => {
                               setSelectedStudentForBulletin(st);
-                              setActiveTab('certificates');
+                              navigateToTab('certificates');
                             }}
                             title="Certificat de Scolarité"
                             className="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/15 rounded-lg transition-colors cursor-pointer"
@@ -1688,6 +1929,31 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
         {/* ==================== TAB: BULLETIN OFFICIEL CONGO ==================== */}
         {activeTab === 'bulletins' && (
           <div className="space-y-6">
+            {/* Quick Navigation Strip inside Bulletin View */}
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('students')}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-emerald-400">arrow_back</span>
+                  <span>Revenir à l'annuaire des Élèves</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('overview')}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-indigo-400">home</span>
+                  <span>Tableau de bord</span>
+                </button>
+              </div>
+              <div className="text-xs text-slate-400 hidden sm:block">
+                Module <span className="text-emerald-400 font-semibold">Notes & Bulletins Officiels (MEPPSA Congo)</span>
+              </div>
+            </div>
+
             {/* Student Switcher and Complete Export Toolbar for Bulletin */}
             <div className="bg-white/[0.04] backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
@@ -2069,6 +2335,31 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
         {/* ==================== TAB: CERTIFICATES ==================== */}
         {activeTab === 'certificates' && (
           <div className="space-y-6 max-w-[800px] mx-auto">
+            {/* Quick Navigation Strip inside Certificates View */}
+            <div className="flex items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('students')}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-emerald-400">arrow_back</span>
+                  <span>Revenir aux Élèves</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('overview')}
+                  className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-indigo-400">home</span>
+                  <span>Tableau de bord</span>
+                </button>
+              </div>
+              <div className="text-xs text-slate-400 hidden sm:block">
+                Module <span className="text-indigo-400 font-semibold">Certificats & Attestations</span>
+              </div>
+            </div>
+
             <div className="bg-white/[0.04] backdrop-blur-xl p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
               <div>
                 <div className="text-xs font-semibold text-slate-200">
@@ -2148,6 +2439,8 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </main>
       </div>

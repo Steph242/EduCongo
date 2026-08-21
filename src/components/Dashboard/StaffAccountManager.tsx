@@ -710,14 +710,24 @@ export const StaffAccountManager: React.FC<StaffAccountManagerProps> = ({
       {/* ================= SUB-TAB 2: PERMISSIONS MATRIX ================= */}
       {subTab === 'matrix' && (
         <div className="bg-white/[0.04] backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] space-y-6">
-          <div>
-            <h3 className="font-bold text-white text-base flex items-center gap-2">
-              <span className="material-symbols-outlined text-emerald-400">policy</span>
-              Matrice des Habilitations par Profil (MEPPSA République du Congo)
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Configuration de la sécurité selon les directives ministérielles pour la protection des données scolaires.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-400">policy</span>
+                Matrice des Habilitations par Profil (MEPPSA République du Congo)
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Configuration de la sécurité selon les directives ministérielles pour la protection des données scolaires.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubTab('accounts')}
+              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer w-fit"
+            >
+              <span className="material-symbols-outlined text-[16px] text-emerald-400">arrow_back</span>
+              <span>Retour aux comptes</span>
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -807,13 +817,25 @@ export const StaffAccountManager: React.FC<StaffAccountManagerProps> = ({
       {subTab === 'audit' && (
         <div className="space-y-4">
           <div className="bg-white/[0.04] backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-            <h3 className="font-bold text-white text-base flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-emerald-400">security</span>
-              Journal des Événements & Audit de Sécurité des Comptes
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Traçabilité en temps réel des accès, modifications de permissions et connexions du personnel.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-2 mb-1">
+                  <span className="material-symbols-outlined text-emerald-400">security</span>
+                  Journal des Événements & Audit de Sécurité des Comptes
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Traçabilité en temps réel des accès, modifications de permissions et connexions du personnel.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubTab('accounts')}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer w-fit"
+              >
+                <span className="material-symbols-outlined text-[16px] text-emerald-400">arrow_back</span>
+                <span>Retour aux comptes</span>
+              </button>
+            </div>
 
             <div className="space-y-2.5 text-xs">
               <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">

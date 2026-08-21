@@ -2,7 +2,7 @@ import { RegisteredSchoolAccount, MicroserviceHealth, DeveloperFeatureFlag, Nati
 import { INITIAL_REGISTERED_SCHOOLS } from '../data/mockRegisteredSchools';
 import { INITIAL_AUDIT_LOGS, AuditLogEntry } from '../data/mockAuditLogs';
 
-const STORAGE_SCHOOLS_KEY = 'educongo_registered_schools_v1';
+const STORAGE_SCHOOLS_KEY = 'educongo_registered_schools_prod';
 const STORAGE_AUDIT_LOGS_KEY = 'educongo_system_audit_logs_v1';
 const STORAGE_FEATURE_FLAGS_KEY = 'educongo_dev_feature_flags_v1';
 
@@ -251,13 +251,13 @@ export function calculateNationalStats(schools: RegisteredSchoolAccount[]): Nati
     totalRegisteredSchools: schools.length,
     activeSchools: activeCount,
     pendingSchools: pendingCount,
-    totalStudentsNational: 4820 + schools.length * 320,
-    totalTeachersNational: 340 + schools.length * 28,
-    totalTuitionCollectedFCFA: 142500000 + schools.length * 8500000,
+    totalStudentsNational: schools.length === 0 ? 0 : schools.length * 280,
+    totalTeachersNational: schools.length === 0 ? 0 : schools.length * 18,
+    totalTuitionCollectedFCFA: schools.length === 0 ? 0 : schools.length * 4500000,
     momoPercentage: 58.4,
     airtelPercentage: 34.2,
-    averageNationalAttendance: 96.8,
-    departmentsCovered: departments.size,
+    averageNationalAttendance: schools.length === 0 ? 0 : 96.8,
+    departmentsCovered: schools.length === 0 ? 0 : departments.size,
   };
 }
 

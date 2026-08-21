@@ -3,10 +3,11 @@ import React from 'react';
 interface FooterProps {
   onOpenAbout: () => void;
   onOpenHelp: () => void;
+  onOpenDevPanel?: () => void;
   onOpenPrivacy?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAbout, onOpenHelp }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenAbout, onOpenHelp, onOpenDevPanel }) => {
   return (
     <footer className="bg-slate-950/50 backdrop-blur-xl border-t border-white/10 mt-auto py-8 relative z-20">
       <div className="w-full px-4 sm:px-6 md:px-8 flex flex-col md:flex-row justify-between items-center max-w-[1280px] mx-auto gap-4">
@@ -21,7 +22,16 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAbout, onOpenHelp }) => {
           © 2024 Système de Gestion Scolaire du Congo. Tous droits réservés.
         </p>
 
-        <nav className="flex items-center gap-6 text-[12px] text-slate-400">
+        <nav className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-[12px] text-slate-400">
+          {onOpenDevPanel && (
+            <button
+              onClick={onOpenDevPanel}
+              className="text-indigo-400 hover:text-indigo-300 font-semibold transition-all flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20"
+            >
+              <span className="material-symbols-outlined text-[14px]">terminal</span>
+              Console Développeur
+            </button>
+          )}
           <button
             onClick={onOpenAbout}
             className="hover:text-emerald-400 hover:underline transition-all cursor-pointer"

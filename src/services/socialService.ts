@@ -94,9 +94,9 @@ export function getSocialPosts(schoolCode?: string): SocialPost[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         if (schoolCode) {
-          return parsed.filter((p) => !p.schoolCode || p.schoolCode === schoolCode || p.schoolCode === 'BZV-24-X8B');
+          return parsed.filter((p) => !p.schoolCode || p.schoolCode.toUpperCase() === schoolCode.toUpperCase());
         }
         return parsed;
       }
@@ -104,7 +104,7 @@ export function getSocialPosts(schoolCode?: string): SocialPost[] {
   } catch (err) {
     console.error('Error reading social posts:', err);
   }
-  return DEFAULT_POSTS;
+  return [];
 }
 
 export function saveSocialPost(post: SocialPost): SocialPost[] {

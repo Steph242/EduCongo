@@ -46,16 +46,8 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
   const [showErrors, setShowErrors] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
-  // Verification modals state
-  const [verificationModal, setVerificationModal] = useState<{
-    isOpen: boolean;
-    type: 'email' | 'phone';
-    targetValue: string;
-  }>({
-    isOpen: false,
-    type: 'phone',
-    targetValue: '',
-  });
+  // Verification modal state (Email verification exclusively)
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
 
   // Camera modal state for school logo
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -91,6 +83,18 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
       .slice(0, 30);
   }, [formData.schoolName, formData.subdomain]);
 
+  // Telecom operator detection for Republic of Congo numbers
+  const detectedOperator = useMemo(() => {
+    const cleanDigits = (formData.workPhone || '').replace(/\D/g, '');
+    if (cleanDigits.startsWith('06') || cleanDigits.startsWith('6')) {
+      return { name: 'MTN Congo', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' };
+    }
+    if (cleanDigits.startsWith('05') || cleanDigits.startsWith('5') || cleanDigits.startsWith('04') || cleanDigits.startsWith('4')) {
+      return { name: 'Airtel Congo', color: 'text-rose-400 bg-rose-500/15 border-rose-500/30' };
+    }
+    return null;
+  }, [formData.workPhone]);
+
   // Validation rules computed in real-time
   const fieldValidation = useMemo(() => {
     const isSchoolNameValid = Boolean(formData.schoolName && formData.schoolName.trim().length >= 3);
@@ -102,6 +106,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isWorkEmailValid = Boolean(formData.workEmail && emailRegex.test(formData.workEmail.trim()));
+    const isEmailVerified = Boolean(formData.isEmailVerified);
     
     const digitsOnly = formData.workPhone ? formData.workPhone.replace(/\D/g, '') : '';
     const isWorkPhoneValid = digitsOnly.length >= 6;
@@ -114,6 +119,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
       { name: "Type d'établissement", valid: isSchoolTypeValid },
       { name: "Nom du responsable", valid: isDirectorNameValid },
       { name: "E-mail professionnel", valid: isWorkEmailValid },
+      { name: "Vérification E-mail", valid: isEmailVerified },
       { name: "Téléphone", valid: isWorkPhoneValid },
     ];
 
@@ -129,6 +135,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
       isSchoolTypeValid,
       isDirectorNameValid,
       isWorkEmailValid,
+      isEmailVerified,
       isWorkPhoneValid,
       requiredFields,
       completedCount,
@@ -183,6 +190,11 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.isEmailVerified) {
+      // If email is not yet verified, open the verification modal directly!
+      setVerificationModalOpen(true);
+      return;
+    }
     if (!fieldValidation.isAllValid) {
       setShowErrors(true);
       return;
@@ -202,7 +214,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
           EduCongo
         </h1>
         <p className="text-[14px] text-slate-300 font-light">
-          Inscription Établissement Scolaire & Portail Numérique
+          Inscription d'un Établissement Scolaire
         </p>
       </div>
 
@@ -237,7 +249,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             <span className={`material-symbols-outlined text-[16px] ${fieldValidation.isAllValid ? 'text-emerald-400' : 'text-amber-400'}`}>
               {fieldValidation.isAllValid ? 'check_circle' : 'pending_actions'}
             </span>
-            {fieldValidation.isAllValid ? 'Toutes les cases sont prêtes' : 'Complétion de l\'étape'}
+            {fieldValidation.isAllValid ? 'Toutes les cases sont prêtes' : 'Remplissage des informations'}
           </span>
           <span className={`font-mono font-bold text-xs ${fieldValidation.isAllValid ? 'text-emerald-400' : 'text-slate-400'}`}>
             {fieldValidation.completedCount} / {fieldValidation.totalCount}
@@ -250,30 +262,27 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             className={`h-full transition-all duration-300 rounded-full ${
               fieldValidation.isAllValid 
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' 
-                : 'bg-gradient-to-r from-indigo-500 to-emerald-400'
+                : 'bg-gradient-to-r from-emerald-600 to-indigo-500'
             }`}
             style={{ width: `${(fieldValidation.completedCount / fieldValidation.totalCount) * 100}%` }}
           ></div>
         </div>
 
-        {/* Warning if user tried to submit with empty fields */}
         {showErrors && !fieldValidation.isAllValid && (
           <div className="mt-2.5 p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-1.5 animate-in fade-in">
-            <span className="material-symbols-outlined text-rose-400 text-[16px]">error</span>
-            <span>Veuillez corriger ou renseigner toutes les cases signalées en rouge.</span>
+            <span className="material-symbols-outlined text-[15px] text-rose-400 shrink-0">error</span>
+            <span>Veuillez compléter toutes les cases requises et vérifier votre e-mail pour continuer.</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 text-left">
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Nom de l'établissement */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label
-              className="block text-[12px] font-medium text-slate-300"
-              htmlFor="schoolName"
-            >
-              Nom de l'établissement <span className="text-rose-400">*</span>
+            <label className="block text-[12px] font-medium text-slate-300" htmlFor="schoolName">
+              Nom officiel de l'établissement <span className="text-rose-400">*</span>
             </label>
             <FormFieldBadge
               isValid={fieldValidation.isSchoolNameValid}
@@ -281,10 +290,13 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
               showErrors={showErrors}
               value={formData.schoolName}
               validLabel="Nom valide"
-              invalidLabel="Min. 3 lettres"
+              invalidLabel="Min. 3 car."
             />
           </div>
           <div className="relative">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+              school
+            </span>
             <input
               id="schoolName"
               name="schoolName"
@@ -293,20 +305,18 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
               value={formData.schoolName}
               onFocus={() => markTouched('schoolName')}
               onChange={(e) => handleSchoolNameChange(e.target.value)}
-              placeholder="Nom complet de l'établissement"
-              className={`w-full rounded-xl border ${
-                (touchedFields.schoolName || showErrors) && !fieldValidation.isSchoolNameValid 
-                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400 ring-1 ring-rose-500/30' 
+              placeholder="Ex: Lycée Victor Augagneur, Collège Mafouta..."
+              className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-[13.5px] outline-none transition-all text-white placeholder:text-slate-500 backdrop-blur-md border ${
+                (touchedFields.schoolName || showErrors) && !fieldValidation.isSchoolNameValid
+                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400 ring-1 ring-rose-500/30'
                   : fieldValidation.isSchoolNameValid && formData.schoolName
                   ? 'border-emerald-400/40 bg-emerald-500/[0.04] focus:border-emerald-400 ring-1 ring-emerald-500/20'
                   : 'border-white/15 bg-white/[0.05]'
-              } text-white focus:bg-white/[0.08] px-3.5 py-2.5 pr-10 text-[14px] transition-all outline-none backdrop-blur-md placeholder:text-slate-500`}
+              }`}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
               {fieldValidation.isSchoolNameValid && formData.schoolName ? (
                 <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
-              ) : (touchedFields.schoolName || showErrors) && !fieldValidation.isSchoolNameValid ? (
-                <span className="material-symbols-outlined text-rose-400 text-[18px]">error</span>
               ) : null}
             </div>
           </div>
@@ -315,112 +325,75 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             isTouched={touchedFields.schoolName}
             showErrors={showErrors}
             value={formData.schoolName}
-            errorMessage="Le nom officiel de l'établissement doit comporter au moins 3 caractères."
-            successMessage="Nom d'établissement valide"
+            errorMessage="Veuillez saisir le nom complet de l'établissement (minimum 3 caractères)."
+            successMessage="Nom d'établissement renseigné"
           />
         </div>
 
-        {/* Slogan & Sous-domaine Numérique (Exigence 7) */}
-        <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3 backdrop-blur-md">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-            <span className="material-symbols-outlined text-emerald-400 text-[18px]">language</span>
-            <span>Sous-domaine & Identité Visuelle de l'École</span>
-          </div>
-
-          {/* Slogan */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1" htmlFor="school-slogan">
-              Devise / Slogan de l'établissement
+        {/* Type d'établissement (Cycles MEPPSA) */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-[12px] font-medium text-slate-300" htmlFor="schoolType">
+              Type & Cycle d'enseignement (MEPPSA) <span className="text-rose-400">*</span>
             </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">
-                format_quote
-              </span>
-              <input
-                id="school-slogan"
-                type="text"
-                value={formData.slogan || ''}
-                onChange={(e) => onChange('slogan', e.target.value)}
-                placeholder="Ex: Discipline - Travail - Succès"
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-white/15 bg-white/[0.05] text-white focus:border-emerald-400 outline-none text-xs backdrop-blur-md"
-              />
-            </div>
+            <FormFieldBadge
+              isValid={fieldValidation.isSchoolTypeValid}
+              isTouched={touchedFields.schoolType}
+              showErrors={showErrors}
+              value={formData.schoolType}
+              validLabel="Cycle choisi"
+              invalidLabel="Sélection requise"
+            />
           </div>
-
-          {/* Subdomain Input */}
-          <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1" htmlFor="school-subdomain">
-              Adresse web dédiée (Sous-domaine personnalisé)
-            </label>
-            <div className="flex items-center">
-              <input
-                id="school-subdomain"
-                type="text"
-                value={formData.subdomain || suggestedSubdomain || ''}
-                onChange={(e) =>
-                  onChange(
-                    'subdomain',
-                    e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9-]/g, '')
-                      .slice(0, 30)
-                  )
-                }
-                placeholder="nom-etablissement"
-                className="w-full px-3 py-2 rounded-l-xl border border-white/15 bg-white/[0.05] text-emerald-300 font-mono text-xs focus:border-emerald-400 outline-none backdrop-blur-md"
-              />
-              <span className="inline-flex items-center px-3 py-2 rounded-r-xl border border-l-0 border-white/15 bg-emerald-500/15 text-emerald-300 text-xs font-mono font-bold whitespace-nowrap">
-                .educongo.cg
-              </span>
-            </div>
-          </div>
-
-          {/* Logo Chooser / Camera Live Capture */}
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-[11px] font-medium text-slate-300">Logo de l'école / Blason officiel</label>
-              <button
-                type="button"
-                onClick={() => setIsCameraOpen(true)}
-                className="text-emerald-400 hover:underline flex items-center gap-1 text-[10.5px] cursor-pointer font-medium"
-              >
-                <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-                Photographier le logo
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              {formData.logoUrl ? (
-                <img
-                  src={formData.logoUrl}
-                  alt="Logo école"
-                  className="w-10 h-10 rounded-xl object-cover border border-emerald-400 shadow-sm shrink-0"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/15 flex items-center justify-center text-slate-400 shrink-0">
-                  <span className="material-symbols-outlined text-[18px]">school</span>
-                </div>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+              account_balance
+            </span>
+            <select
+              id="schoolType"
+              name="schoolType"
+              required
+              value={formData.schoolType}
+              onFocus={() => markTouched('schoolType')}
+              onChange={(e) => {
+                markTouched('schoolType');
+                onChange('schoolType', e.target.value as SchoolType);
+              }}
+              className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-[13px] outline-none transition-all text-white backdrop-blur-md appearance-none cursor-pointer border ${
+                (touchedFields.schoolType || showErrors) && !fieldValidation.isSchoolTypeValid
+                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400 ring-1 ring-rose-500/30'
+                  : fieldValidation.isSchoolTypeValid && formData.schoolType
+                  ? 'border-emerald-400/40 bg-emerald-500/[0.04] focus:border-emerald-400 ring-1 ring-emerald-500/20'
+                  : 'border-white/15 bg-white/[0.05]'
+              }`}
+            >
+              <option value="" className="bg-slate-900 text-slate-400">
+                -- Sélectionnez le cycle / type d'enseignement --
+              </option>
+              {SCHOOL_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                  {opt.label} — {opt.description}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1">
+              {fieldValidation.isSchoolTypeValid && formData.schoolType && (
+                <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
               )}
-
-              <div className="flex-1 flex gap-1.5 overflow-x-auto">
-                {LOGO_PRESETS.map((url, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => onChange('logoUrl', url)}
-                    className={`w-7 h-7 rounded-lg overflow-hidden border transition-all cursor-pointer shrink-0 ${
-                      formData.logoUrl === url ? 'border-emerald-400 scale-110' : 'border-white/20 opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <img src={url} alt={`Preset ${i}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+              <span className="material-symbols-outlined text-slate-400 text-[18px]">expand_more</span>
             </div>
           </div>
+          <FormFieldFeedback
+            isValid={fieldValidation.isSchoolTypeValid}
+            isTouched={touchedFields.schoolType}
+            showErrors={showErrors}
+            value={formData.schoolType}
+            errorMessage="Veuillez sélectionner le type d'établissement homologué."
+            successMessage="Cycle d'enseignement validé"
+          />
         </div>
 
-        {/* Département & Ville Grid */}
+        {/* Localisation Territoriale (Département, Ville, Arrondissement) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Département */}
           <div>
@@ -433,8 +406,8 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
                 isTouched={touchedFields.department}
                 showErrors={showErrors}
                 value={formData.department}
-                validLabel="Sélectionné"
-                invalidLabel="Choix requis"
+                validLabel="Choisi"
+                invalidLabel="Requis"
               />
             </div>
             <div className="relative">
@@ -443,31 +416,30 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
                 name="department"
                 required
                 value={formData.department}
+                onFocus={() => markTouched('department')}
                 onChange={(e) => handleDepartmentChange(e.target.value)}
-                className={`w-full rounded-xl border ${
-                  (touchedFields.department || showErrors) && !fieldValidation.isDepartmentValid 
-                    ? 'border-rose-400/70 bg-rose-500/10' 
-                    : fieldValidation.isDepartmentValid && formData.department
-                    ? 'border-emerald-400/40 bg-emerald-500/[0.04]'
+                className={`w-full px-3 py-2 rounded-xl text-[13px] outline-none transition-all text-white backdrop-blur-md appearance-none cursor-pointer border ${
+                  (touchedFields.department || showErrors) && !fieldValidation.isDepartmentValid
+                    ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
                     : 'border-white/15 bg-white/[0.05]'
-                } text-slate-200 focus:border-emerald-400 focus:bg-white/[0.08] px-3 py-2 text-[13px] appearance-none transition-all outline-none pr-8 cursor-pointer backdrop-blur-md`}
+                }`}
               >
-                <option value="" disabled className="bg-[#0b1329] text-slate-400">
-                  Sélectionner un département
+                <option value="" className="bg-slate-900 text-slate-400">
+                  -- Choisir un département --
                 </option>
                 {CONGO_DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept} className="bg-[#0b1329] text-white">
-                    {dept} ({CONGO_DEPARTMENTS_CONFIG[dept]?.code})
+                  <option key={dept} value={dept} className="bg-slate-900 text-white">
+                    {dept}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                <span className="material-symbols-outlined text-[18px]">expand_more</span>
-              </div>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">
+                expand_more
+              </span>
             </div>
           </div>
 
-          {/* Ville / Commune */}
+          {/* Ville */}
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-[12px] font-medium text-slate-300" htmlFor="city">
@@ -478,8 +450,8 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
                 isTouched={touchedFields.city}
                 showErrors={showErrors}
                 value={formData.city}
-                validLabel="Sélectionné"
-                invalidLabel="Choix requis"
+                validLabel="Choisie"
+                invalidLabel="Requis"
               />
             </div>
             <div className="relative">
@@ -487,29 +459,28 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
                 id="city"
                 name="city"
                 required
-                value={formData.city}
-                onChange={(e) => handleCityChange(e.target.value)}
                 disabled={!formData.department}
-                className={`w-full rounded-xl border ${
-                  (touchedFields.city || showErrors) && !fieldValidation.isCityValid 
-                    ? 'border-rose-400/70 bg-rose-500/10' 
-                    : fieldValidation.isCityValid && formData.city
-                    ? 'border-emerald-400/40 bg-emerald-500/[0.04]'
+                value={formData.city}
+                onFocus={() => markTouched('city')}
+                onChange={(e) => handleCityChange(e.target.value)}
+                className={`w-full px-3 py-2 rounded-xl text-[13px] outline-none transition-all text-white backdrop-blur-md appearance-none cursor-pointer border ${
+                  (touchedFields.city || showErrors) && !fieldValidation.isCityValid
+                    ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
                     : 'border-white/15 bg-white/[0.05]'
-                } text-slate-200 focus:border-emerald-400 focus:bg-white/[0.08] px-3 py-2 text-[13px] appearance-none transition-all outline-none pr-8 cursor-pointer backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                } ${!formData.department ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <option value="" disabled className="bg-[#0b1329] text-slate-400">
-                  {formData.department ? 'Sélectionner une ville' : 'Choisir département d\'abord'}
+                <option value="" className="bg-slate-900 text-slate-400">
+                  {formData.department ? '-- Choisir une ville --' : 'Sélectionnez un département'}
                 </option>
                 {availableCities.map((c) => (
-                  <option key={c} value={c} className="bg-[#0b1329] text-white">
+                  <option key={c} value={c} className="bg-slate-900 text-white">
                     {c}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                <span className="material-symbols-outlined text-[18px]">expand_more</span>
-              </div>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">
+                expand_more
+              </span>
             </div>
           </div>
         </div>
@@ -518,301 +489,288 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-[12px] font-medium text-slate-300" htmlFor="arrondissement">
-              Arrondissement / Quartier {formData.department ? `(${formData.department})` : ''} <span className="text-rose-400">*</span>
+              Arrondissement / Quartier <span className="text-rose-400">*</span>
             </label>
             <FormFieldBadge
               isValid={fieldValidation.isArrondissementValid}
               isTouched={touchedFields.arrondissement}
               showErrors={showErrors}
               value={formData.arrondissement}
-              validLabel="Défini"
-              invalidLabel="Choix requis"
+              validLabel="Renseigné"
+              invalidLabel="Requis"
             />
           </div>
-          <div className="relative">
-            <select
+          {availableArrondissements.length > 0 ? (
+            <div className="relative">
+              <select
+                id="arrondissement"
+                name="arrondissement"
+                required
+                value={formData.arrondissement}
+                onFocus={() => markTouched('arrondissement')}
+                onChange={(e) => {
+                  markTouched('arrondissement');
+                  onChange('arrondissement', e.target.value);
+                }}
+                className={`w-full px-3 py-2 rounded-xl text-[13px] outline-none transition-all text-white backdrop-blur-md appearance-none cursor-pointer border ${
+                  (touchedFields.arrondissement || showErrors) && !fieldValidation.isArrondissementValid
+                    ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
+                    : 'border-white/15 bg-white/[0.05]'
+                }`}
+              >
+                <option value="" className="bg-slate-900 text-slate-400">
+                  -- Choisir un arrondissement / secteur --
+                </option>
+                {availableArrondissements.map((arr) => (
+                  <option key={arr} value={arr} className="bg-slate-900 text-white">
+                    {arr}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] pointer-events-none">
+                expand_more
+              </span>
+            </div>
+          ) : (
+            <input
               id="arrondissement"
               name="arrondissement"
+              type="text"
               required
               value={formData.arrondissement}
+              onFocus={() => markTouched('arrondissement')}
               onChange={(e) => {
                 markTouched('arrondissement');
                 onChange('arrondissement', e.target.value);
               }}
-              disabled={!formData.department}
-              className={`w-full rounded-xl border ${
-                (touchedFields.arrondissement || showErrors) && !fieldValidation.isArrondissementValid 
-                  ? 'border-rose-400/70 bg-rose-500/10' 
-                  : fieldValidation.isArrondissementValid && formData.arrondissement
-                  ? 'border-emerald-400/40 bg-emerald-500/[0.04]'
+              placeholder="Ex: Centre-ville, Quartier Ouenze, Quartier Mpita..."
+              className={`w-full px-3 py-2 rounded-xl text-[13px] outline-none transition-all text-white placeholder:text-slate-500 backdrop-blur-md border ${
+                (touchedFields.arrondissement || showErrors) && !fieldValidation.isArrondissementValid
+                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
                   : 'border-white/15 bg-white/[0.05]'
-              } text-slate-200 focus:border-emerald-400 focus:bg-white/[0.08] px-3.5 py-2 text-[13px] appearance-none transition-all outline-none pr-8 cursor-pointer backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <option value="" disabled className="bg-[#0b1329] text-slate-400">
-                {formData.department ? 'Sélectionner arrondissement / quartier' : 'Choisir département d\'abord'}
-              </option>
-              {availableArrondissements.map((arr) => (
-                <option key={arr} value={arr} className="bg-[#0b1329] text-white">
-                  {arr}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-              <span className="material-symbols-outlined text-[18px]">expand_more</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Code Établissement Auto-généré */}
-        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <label className="text-[12px] font-semibold text-slate-300 flex items-center gap-1.5" htmlFor="school-code">
-              <span className="material-symbols-outlined text-indigo-400 text-[16px]">qr_code_2</span>
-              Code Établissement Auto-généré
-            </label>
-            {formData.department && (
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">done</span>
-                {currentDeptConfig?.code || 'CONGO'}
-              </span>
-            )}
-          </div>
-
-          <input
-            id="school-code"
-            name="school-code"
-            type="text"
-            readOnly
-            value={formData.schoolCode || 'Attente de sélection du département...'}
-            className="w-full rounded-xl border border-indigo-400/40 bg-indigo-500/15 text-indigo-200 font-mono font-bold tracking-wider px-3.5 py-2 text-[13px] cursor-not-allowed select-all backdrop-blur-md shadow-[0_0_15px_rgba(99,102,241,0.2)]"
-          />
-
-          <div className="relative">
-            <select
-              id="code-format"
-              name="code-format"
-              value={formData.codeFormat}
-              onChange={(e) => handleFormatChange(e.target.value as CodeFormat)}
-              className="w-full rounded-xl border border-white/15 bg-white/[0.05] text-slate-200 focus:border-emerald-400 px-3 py-1.5 text-[12px] appearance-none outline-none pr-8 cursor-pointer"
-            >
-              <option value="departement" className="bg-[#0b1329] text-white">
-                Format Département ({currentDeptConfig?.code || 'BZV'}-24-X8B)
-              </option>
-              <option value="standard" className="bg-[#0b1329] text-white">
-                Format National Standard (CG-{currentDeptConfig?.code || 'BZV'}-24-X8B)
-              </option>
-              <option value="annee" className="bg-[#0b1329] text-white">
-                Format Année Complète ({currentDeptConfig?.code || 'BZV'}-2024-X8B)
-              </option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-              <span className="material-symbols-outlined text-[16px]">expand_more</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Type d'établissement (Exigence 4) */}
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="block text-[12px] font-medium text-slate-300" htmlFor="school-type">
-              Type / Ordre d'établissement <span className="text-rose-400">*</span>
-            </label>
-            <FormFieldBadge
-              isValid={fieldValidation.isSchoolTypeValid}
-              isTouched={touchedFields.schoolType}
-              showErrors={showErrors}
-              value={formData.schoolType}
-              validLabel="Sélectionné"
-              invalidLabel="Choix requis"
+              }`}
             />
+          )}
+        </div>
+
+        {/* Code Établissement (Généré avec choix du format) */}
+        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
+              Code Établissement MEPPSA
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">Homologation 2024-2025</span>
           </div>
-          <div className="relative">
-            <select
-              id="school-type"
-              name="school-type"
-              required
-              value={formData.schoolType}
-              onChange={(e) => {
-                markTouched('schoolType');
-                onChange('schoolType', e.target.value);
+
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="text"
+              readOnly
+              value={formData.schoolCode || 'Sélectionnez un département ci-dessus'}
+              className="flex-1 font-mono text-emerald-300 font-extrabold text-sm px-3 py-2 rounded-xl bg-black/40 border border-emerald-500/30 text-center tracking-wider"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (formData.department) {
+                  const newCode = generateSchoolCode(formData.department, formData.codeFormat || 'departement');
+                  onChange('schoolCode', newCode);
+                }
               }}
-              className={`w-full rounded-xl border ${
-                (touchedFields.schoolType || showErrors) && !fieldValidation.isSchoolTypeValid 
-                  ? 'border-rose-400/70 bg-rose-500/10' 
-                  : fieldValidation.isSchoolTypeValid && formData.schoolType
-                  ? 'border-emerald-400/40 bg-emerald-500/[0.04]'
-                  : 'border-white/15 bg-white/[0.05]'
-              } text-slate-200 focus:border-emerald-400 focus:bg-white/[0.08] px-3.5 py-2.5 text-[13px] appearance-none transition-all outline-none pr-8 cursor-pointer backdrop-blur-md`}
+              className="px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs border border-white/10 cursor-pointer"
+              title="Régénérer le code"
             >
-              <option value="" disabled className="bg-[#0b1329] text-slate-400">
-                Sélectionnez le type d'établissement
-              </option>
-              {SCHOOL_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value} className="bg-[#0b1329] text-white">
-                  {opt.label} ({opt.description})
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-              <span className="material-symbols-outlined text-[18px]">expand_more</span>
-            </div>
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
+            </button>
+          </div>
+
+          {/* Format selection */}
+          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+            <span>Format :</span>
+            {(['departement', 'annee', 'standard'] as CodeFormat[]).map((fmt) => (
+              <label key={fmt} className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="codeFormat"
+                  checked={formData.codeFormat === fmt}
+                  onChange={() => handleFormatChange(fmt)}
+                  className="accent-emerald-500 w-3 h-3"
+                />
+                <span className={formData.codeFormat === fmt ? 'text-emerald-300 font-bold' : ''}>
+                  {fmt === 'departement' ? 'BZV-24-XXX' : fmt === 'annee' ? '2024-BZV-XXX' : 'CG-BZV-XXX'}
+                </span>
+              </label>
+            ))}
           </div>
         </div>
 
-        {/* Nom du responsable */}
+        {/* Nom du Responsable / Directeur */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-[12px] font-medium text-slate-300" htmlFor="admin-name">
-              Nom du responsable (Directeur / Proviseur) <span className="text-rose-400">*</span>
+            <label className="block text-[12px] font-medium text-slate-300" htmlFor="directorName">
+              Nom & Prénom du Responsable / Fondateur <span className="text-rose-400">*</span>
             </label>
             <FormFieldBadge
               isValid={fieldValidation.isDirectorNameValid}
               isTouched={touchedFields.directorName}
               showErrors={showErrors}
               value={formData.directorName}
-              validLabel="Rempli"
-              invalidLabel="Min. 2 lettres"
+              validLabel="Renseigné"
+              invalidLabel="Min. 2 car."
             />
           </div>
-          <input
-            id="admin-name"
-            name="admin-name"
-            type="text"
-            required
-            value={formData.directorName}
-            onFocus={() => markTouched('directorName')}
-            onChange={(e) => {
-              markTouched('directorName');
-              onChange('directorName', e.target.value);
-            }}
-            placeholder="Prénom Nom du Chef d'Établissement"
-            className="w-full rounded-xl border border-white/15 bg-white/[0.05] text-white focus:border-emerald-400 px-3.5 py-2 text-[13.5px] outline-none backdrop-blur-md"
-          />
-        </div>
-
-        {/* E-mail professionnel + Vérification (Exigence 1) */}
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="block text-[12px] font-medium text-slate-300" htmlFor="email">
-              E-mail professionnel <span className="text-rose-400">*</span>
-            </label>
-            {formData.isEmailVerified ? (
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-500/40">
-                <span className="material-symbols-outlined text-[13px]">verified</span>
-                Vérifié par lien
-              </span>
-            ) : (
-              <FormFieldBadge
-                isValid={fieldValidation.isWorkEmailValid}
-                isTouched={touchedFields.workEmail}
-                showErrors={showErrors}
-                value={formData.workEmail}
-                validLabel="Email valide"
-                invalidLabel="Format email"
-              />
-            )}
-          </div>
-          <div className="flex gap-2">
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+              person
+            </span>
             <input
-              id="email"
-              name="email"
-              type="email"
+              id="directorName"
+              name="directorName"
+              type="text"
               required
-              value={formData.workEmail}
-              onFocus={() => markTouched('workEmail')}
+              value={formData.directorName}
+              onFocus={() => markTouched('directorName')}
               onChange={(e) => {
-                markTouched('workEmail');
-                onChange('workEmail', e.target.value);
+                markTouched('directorName');
+                onChange('directorName', e.target.value);
               }}
-              placeholder="direction@ecole.cg"
-              className="flex-1 rounded-xl border border-white/15 bg-white/[0.05] text-white focus:border-emerald-400 px-3.5 py-2 text-[13px] outline-none backdrop-blur-md font-mono"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setVerificationModal({
-                  isOpen: true,
-                  type: 'email',
-                  targetValue: formData.workEmail || 'direction@ecole.cg',
-                })
-              }
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                formData.isEmailVerified
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-indigo-500/40'
+              placeholder="Ex: M. Jean-Claude MOUNGOUNGA"
+              className={`w-full pl-10 pr-10 py-2.5 rounded-xl text-[13px] outline-none transition-all text-white placeholder:text-slate-500 backdrop-blur-md border ${
+                (touchedFields.directorName || showErrors) && !fieldValidation.isDirectorNameValid
+                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
+                  : 'border-white/15 bg-white/[0.05]'
               }`}
-            >
-              <span className="material-symbols-outlined text-[15px]">
-                {formData.isEmailVerified ? 'mark_email_read' : 'send'}
-              </span>
-              <span>{formData.isEmailVerified ? 'Confirmé' : 'Vérifier (Lien)'}</span>
-            </button>
+            />
           </div>
         </div>
 
-        {/* Numéro de téléphone (+242) + Vérification OTP (Exigence 1) */}
+        {/* E-mail professionnel + Vérification E-mail Obligatoire (Exigence 4 & 1) */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-[12px] font-medium text-slate-300" htmlFor="phone">
-              Numéro de téléphone (+242) <span className="text-rose-400">*</span>
-            </label>
-            {formData.isPhoneVerified ? (
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-500/40">
+            <div className="flex items-center gap-1.5">
+              <label className="block text-[12px] font-medium text-slate-300" htmlFor="email">
+                E-mail professionnel de l'établissement <span className="text-rose-400">*</span>
+              </label>
+            </div>
+            {formData.isEmailVerified ? (
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-500/40 animate-in fade-in">
                 <span className="material-symbols-outlined text-[13px]">verified</span>
-                Vérifié par OTP
+                E-mail vérifié (Supabase Auth)
               </span>
             ) : (
-              <FormFieldBadge
-                isValid={fieldValidation.isWorkPhoneValid}
-                isTouched={touchedFields.workPhone}
-                showErrors={showErrors}
-                value={formData.workPhone}
-                validLabel="Numéro valide"
-                invalidLabel="Min. 6 chiffres"
-              />
+              <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                Vérification requise
+              </span>
             )}
           </div>
           <div className="flex gap-2">
-            <div className="flex flex-1">
-              <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-white/15 bg-white/[0.08] text-emerald-300 text-[13px] font-semibold backdrop-blur-md">
-                +242
+            <div className="relative flex-1">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                mail
               </span>
               <input
-                id="phone"
-                name="phone"
-                type="tel"
+                id="email"
+                name="email"
+                type="email"
                 required
-                value={formData.workPhone}
-                onFocus={() => markTouched('workPhone')}
+                value={formData.workEmail}
+                onFocus={() => markTouched('workEmail')}
                 onChange={(e) => {
-                  markTouched('workPhone');
-                  onChange('workPhone', e.target.value);
+                  markTouched('workEmail');
+                  onChange('workEmail', e.target.value);
+                  if (formData.isEmailVerified) {
+                    onChange('isEmailVerified', false);
+                  }
                 }}
-                placeholder="06 000 00 00"
-                className="w-full rounded-r-xl border border-white/15 bg-white/[0.05] text-white focus:border-emerald-400 px-3 py-2 text-[13px] outline-none backdrop-blur-md font-mono"
+                placeholder="direction@ecole.cg"
+                className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border ${
+                  formData.isEmailVerified
+                    ? 'border-emerald-400/50 bg-emerald-500/[0.04]'
+                    : 'border-white/15 bg-white/[0.05]'
+                } text-white focus:border-emerald-400 text-[13px] outline-none backdrop-blur-md font-mono`}
               />
             </div>
             <button
               type="button"
-              onClick={() =>
-                setVerificationModal({
-                  isOpen: true,
-                  type: 'phone',
-                  targetValue: formData.workPhone ? `+242 ${formData.workPhone}` : '+242 06 650 12 34',
-                })
-              }
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                formData.isPhoneVerified
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 border-yellow-500/40'
+              onClick={() => {
+                if (!formData.workEmail || !formData.workEmail.includes('@')) {
+                  alert('Veuillez d\'abord saisir une adresse e-mail valide.');
+                  return;
+                }
+                setVerificationModalOpen(true);
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                formData.isEmailVerified
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-emerald-400/40 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
               }`}
             >
-              <span className="material-symbols-outlined text-[15px]">
-                {formData.isPhoneVerified ? 'check_circle' : 'sms'}
+              <span className="material-symbols-outlined text-[16px]">
+                {formData.isEmailVerified ? 'check_circle' : 'mark_email_read'}
               </span>
-              <span>{formData.isPhoneVerified ? 'Validé' : 'Vérifier (OTP)'}</span>
+              <span>{formData.isEmailVerified ? 'Vérifié' : 'Vérifier l\'E-mail'}</span>
             </button>
           </div>
+          <FormFieldFeedback
+            isValid={fieldValidation.isWorkEmailValid}
+            isTouched={touchedFields.workEmail}
+            showErrors={showErrors}
+            value={formData.workEmail}
+            errorMessage="Veuillez saisir une adresse e-mail professionnelle valide."
+            successMessage={formData.isEmailVerified ? "Adresse e-mail confirmée" : "Format e-mail valide"}
+          />
+        </div>
+
+        {/* Numéro de téléphone (+242) SANS vérification OTP (Exigence 4) */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <div className="flex items-center gap-1.5">
+              <label className="block text-[12px] font-medium text-slate-300" htmlFor="phone">
+                Numéro de téléphone (+242) <span className="text-rose-400">*</span>
+              </label>
+              {detectedOperator && (
+                <span className={`text-[9.5px] px-2 py-0.2 rounded-full border font-bold ${detectedOperator.color} animate-in fade-in`}>
+                  {detectedOperator.name}
+                </span>
+              )}
+            </div>
+            <FormFieldBadge
+              isValid={fieldValidation.isWorkPhoneValid}
+              isTouched={touchedFields.workPhone}
+              showErrors={showErrors}
+              value={formData.workPhone}
+              validLabel="Numéro valide"
+              invalidLabel="Min. 6 chiffres"
+            />
+          </div>
+          <div className="flex">
+            <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-white/15 bg-white/[0.08] text-emerald-300 text-[13px] font-semibold backdrop-blur-md">
+              +242
+            </span>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              value={formData.workPhone}
+              onFocus={() => markTouched('workPhone')}
+              onChange={(e) => {
+                markTouched('workPhone');
+                onChange('workPhone', e.target.value);
+              }}
+              placeholder="06 000 00 00"
+              className="w-full rounded-r-xl border border-white/15 bg-white/[0.05] text-white focus:border-emerald-400 px-3.5 py-2.5 text-[13.5px] outline-none backdrop-blur-md font-mono"
+            />
+          </div>
+          <FormFieldFeedback
+            isValid={fieldValidation.isWorkPhoneValid}
+            isTouched={touchedFields.workPhone}
+            showErrors={showErrors}
+            value={formData.workPhone}
+            errorMessage="Numéro de contact requis (min. 6 chiffres)."
+            successMessage="Numéro de téléphone enregistré"
+          />
         </div>
 
         {/* Submit Button */}
@@ -823,12 +781,16 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             className={`w-full text-white text-[14px] font-semibold rounded-xl py-3 border transition-all flex justify-center items-center ${
               fieldValidation.isAllValid
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 border-emerald-400/30 shadow-[0_0_25px_rgba(16,185,129,0.35)] cursor-pointer active:scale-[0.99]'
+                : !formData.isEmailVerified && fieldValidation.isWorkEmailValid
+                ? 'bg-gradient-to-r from-amber-600 to-emerald-700 hover:from-amber-500 hover:to-emerald-600 border-amber-400/40 shadow-[0_0_20px_rgba(245,158,11,0.25)] cursor-pointer'
                 : 'bg-slate-800/60 text-slate-400 border-white/10 cursor-not-allowed opacity-70 shadow-none'
             }`}
           >
             <span>
               {fieldValidation.isAllValid 
                 ? 'Étape Suivante (Admin)' 
+                : !formData.isEmailVerified && fieldValidation.isWorkEmailValid
+                ? 'Vérifier l\'e-mail pour continuer'
                 : `Remplir toutes les cases (${fieldValidation.completedCount}/${fieldValidation.totalCount})`}
             </span>
             <span className={`material-symbols-outlined ml-2 text-[18px] ${fieldValidation.isAllValid ? 'text-white' : 'text-slate-400'}`}>
@@ -850,19 +812,16 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
         </p>
       </form>
 
-      {/* Verification Modal for Phone OTP & Email Link */}
+      {/* Verification Modal for Email Confirmation (Exigence 1 & 4) */}
       <VerificationModal
-        isOpen={verificationModal.isOpen}
-        onClose={() => setVerificationModal((prev) => ({ ...prev, isOpen: false }))}
-        type={verificationModal.type}
-        targetValue={verificationModal.targetValue}
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        type="email"
+        targetValue={formData.workEmail || 'direction@ecole.cg'}
         schoolName={formData.schoolName || 'Votre établissement'}
         onVerified={() => {
-          if (verificationModal.type === 'phone') {
-            onChange('isPhoneVerified', true);
-          } else {
-            onChange('isEmailVerified', true);
-          }
+          onChange('isEmailVerified', true);
+          setVerificationModalOpen(false);
         }}
       />
 

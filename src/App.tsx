@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AuthViewMode, AppScreen, SchoolRegistrationData, SystemNotification, Student, StaffAccount, AdminDocument } from './types';
+import { supabase } from './lib/supabase';
+import { getRegisteredAccounts, saveRegisteredAccount, verifySchoolLogin, markAccountEmailVerified } from './services/accountService';
+import { isEmailAlreadyVerified, sendEmailVerificationCode } from './services/supabase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LeftHeroPanel } from './components/Auth/LeftHeroPanel';
@@ -7,17 +10,18 @@ import { LoginCard } from './components/Auth/LoginCard';
 import { RegisterStep1 } from './components/Auth/RegisterStep1';
 import { RegisterStep2 } from './components/Auth/RegisterStep2';
 import { RegisterStep3 } from './components/Auth/RegisterStep3';
+import { EmailVerificationCard } from './components/Auth/EmailVerificationCard';
 import { RegisterSuccess } from './components/Auth/RegisterSuccess';
 import { SchoolDashboard } from './components/Dashboard/SchoolDashboard';
 import { SchoolSubdomainView } from './components/Social/SchoolSubdomainView';
 import { DevControlPanel } from './components/DevControlPanel/DevControlPanel';
-import { DemoQuickSwitcher } from './components/Common/DemoQuickSwitcher';
 import { ForgotPasswordModal } from './components/Modals/ForgotPasswordModal';
 import { AboutModal, HelpModal } from './components/Modals/AboutModal';
 import { NotificationDetailModal } from './components/Modals/NotificationDetailModal';
 import { DocumentViewerModal } from './components/Modals/DocumentViewerModal';
 import { StudentQuickViewModal } from './components/Modals/StudentQuickViewModal';
 import { StaffAccessCardModal } from './components/Dashboard/StaffAccessCardModal';
+import { DevAuthModal } from './components/DevControlPanel/DevAuthModal';
 import { OfflineAlertBanner } from './components/Common/OfflineAlertBanner';
 import { ToastNotification } from './components/Common/ToastNotification';
 import { useNotifications } from './hooks/useNotifications';
@@ -54,12 +58,12 @@ export function App() {
 
   // Active school data (for dashboard and forms)
   const [currentSchool, setCurrentSchool] = useState({
-    name: "Lycée d'Excellence de Brazzaville",
-    city: 'Brazzaville',
-    code: 'BZV-24-X8B',
-    slogan: 'Travail - Rigueur - Réussite',
-    logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
-    subdomain: 'lycee-excellence',
+    name: '',
+    city: '',
+    code: '',
+    slogan: 'Discipline - Travail - Succès',
+    logoUrl: '',
+    subdomain: '',
   });
 
   // Global search navigation & selected items
@@ -102,10 +106,200 @@ export function App() {
     } catch {}
   }, []);
 
+  // Supabase Auth Session Listener & Auto-login
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn('Supabase getSession notice:', error.message);
+        return;
+      }
+      if (session?.user) {
+        const isConfirmed = Boolean(
+          session.user.email_confirmed_at ||
+          session.user.confirmed_at ||
+          session.user.user_metadata?.email_verified ||
+          (session.user.email && isEmailAlreadyVerified(session.user.email))
+        );
+
+        const metadata = session.user.user_metadata || {};
+        const schoolInfo = {
+          name: metadata.school_name || metadata.schoolName || session.user.email?.split('@')[0] || 'Établissement Scolaire',
+          city: metadata.city || 'Brazzaville',
+          code: metadata.school_code || metadata.schoolCode || 'CG-2024',
+          slogan: metadata.slogan || 'Discipline - Travail - Succès',
+          logoUrl: metadata.logo_url || metadata.logoUrl || '',
+          subdomain: metadata.subdomain || 'mon-ecole',
+        };
+        setCurrentSchool(schoolInfo);
+
+        if (isConfirmed) {
+          setIsLoggedIn(true);
+          setCurrentScreen('dashboard');
+        } else {
+          // Email not confirmed: lock dashboard, require email verification
+          setIsLoggedIn(false);
+          setCurrentScreen('auth');
+          setRegistrationData((prev) => ({
+            ...prev,
+            workEmail: session.user.email || prev.workEmail,
+            schoolName: schoolInfo.name,
+            schoolCode: schoolInfo.code,
+            isEmailVerified: false,
+          }));
+          setAuthMode('verify_email');
+        }
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const isConfirmed = Boolean(
+          session.user.email_confirmed_at ||
+          session.user.confirmed_at ||
+          session.user.user_metadata?.email_verified ||
+          (session.user.email && isEmailAlreadyVerified(session.user.email))
+        );
+
+        const metadata = session.user.user_metadata || {};
+        setCurrentSchool({
+          name: metadata.school_name || metadata.schoolName || session.user.email?.split('@')[0] || 'Établissement Scolaire',
+          city: metadata.city || 'Brazzaville',
+          code: metadata.school_code || metadata.schoolCode || 'CG-2024',
+          slogan: metadata.slogan || 'Discipline - Travail - Succès',
+          logoUrl: metadata.logo_url || metadata.logoUrl || '',
+          subdomain: metadata.subdomain || 'mon-ecole',
+        });
+
+        if (isConfirmed) {
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Modals visibility
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
+  const [isDevAuthenticated, setIsDevAuthenticated] = useState(false);
+
+  const handleOpenDevPanel = () => {
+    if (isDevAuthenticated) {
+      setCurrentScreen('dev_panel');
+    } else {
+      setIsDevAuthModalOpen(true);
+    }
+  };
+
+  // Universal Back Navigation Handler across entire application
+  const hasActiveModal = Boolean(
+    selectedDocForViewer ||
+    selectedStudentForView ||
+    selectedStaffForCard ||
+    selectedNotification ||
+    isForgotModalOpen ||
+    isAboutModalOpen ||
+    isHelpModalOpen ||
+    isDevAuthModalOpen
+  );
+
+  const canGoBack = Boolean(
+    hasActiveModal ||
+    currentScreen === 'dev_panel' ||
+    currentScreen === 'subdomain_portal' ||
+    (currentScreen === 'auth' && authMode !== 'login') ||
+    (currentScreen === 'dashboard' && dashboardTab !== 'overview')
+  );
+
+  const handleUniversalBack = () => {
+    // 1. If any modal is open, close modal first
+    if (selectedDocForViewer) {
+      setSelectedDocForViewer(null);
+      return;
+    }
+    if (selectedStudentForView) {
+      setSelectedStudentForView(null);
+      return;
+    }
+    if (selectedStaffForCard) {
+      setSelectedStaffForCard(null);
+      return;
+    }
+    if (selectedNotification) {
+      setSelectedNotification(null);
+      return;
+    }
+    if (isForgotModalOpen) {
+      setIsForgotModalOpen(false);
+      return;
+    }
+    if (isAboutModalOpen) {
+      setIsAboutModalOpen(false);
+      return;
+    }
+    if (isHelpModalOpen) {
+      setIsHelpModalOpen(false);
+      return;
+    }
+
+    // 2. If inside Subdomain portal or Dev Control Panel
+    if (currentScreen === 'subdomain_portal' || currentScreen === 'dev_panel') {
+      setCurrentScreen(isLoggedIn ? 'dashboard' : 'auth');
+      return;
+    }
+
+    // 3. If in registration wizard steps
+    if (currentScreen === 'auth') {
+      if (authMode === 'register_step3') {
+        setAuthMode('register_step2');
+      } else if (authMode === 'register_step2') {
+        setAuthMode('register_step1');
+      } else if (authMode === 'register_step1' || authMode === 'register_success') {
+        setAuthMode('login');
+      }
+      return;
+    }
+
+    // 4. If in dashboard sub-modules
+    if (currentScreen === 'dashboard') {
+      if (dashboardTab !== 'overview') {
+        setDashboardTab('overview');
+      }
+    }
+  };
+
+  // Browser History & Popstate synchronization
+  useEffect(() => {
+    const handlePopState = () => {
+      handleUniversalBack();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    selectedDocForViewer,
+    selectedStudentForView,
+    selectedStaffForCard,
+    selectedNotification,
+    isForgotModalOpen,
+    isAboutModalOpen,
+    isHelpModalOpen,
+    currentScreen,
+    authMode,
+    dashboardTab,
+    isLoggedIn,
+  ]);
 
   const handleRegistrationChange = (field: keyof SchoolRegistrationData, value: any) => {
     setRegistrationData((prev) => ({
@@ -129,7 +323,243 @@ export function App() {
     setCurrentScreen('dashboard');
   };
 
-  const handleLogout = () => {
+  /**
+   * Real Supabase Authentication: signInWithPassword
+   */
+  const handleLoginWithSupabase = async (
+    identifier: string,
+    password: string,
+    mode: 'phone' | 'email'
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      let emailToUse = identifier.trim().toLowerCase();
+
+      // Resolve email if user entered a phone number or a school code
+      if (!emailToUse.includes('@')) {
+        const accounts = getRegisteredAccounts();
+        const cleanInput = identifier.replace(/\D/g, '');
+        const matched = accounts.find((acc) => {
+          if (mode === 'phone') {
+            const p1 = (acc.workPhone || '').replace(/\D/g, '');
+            const p2 = (acc.personalPhone || '').replace(/\D/g, '');
+            return (p1 && p1.endsWith(cleanInput)) || (p2 && p2.endsWith(cleanInput));
+          }
+          return acc.schoolCode.toUpperCase() === identifier.toUpperCase().trim();
+        });
+
+        if (matched && (matched.workEmail || matched.personalEmail)) {
+          emailToUse = (matched.workEmail || matched.personalEmail)!.toLowerCase();
+        } else {
+          emailToUse =
+            mode === 'phone'
+              ? `${cleanInput || 'school'}@educongo.cg`
+              : `${identifier.toLowerCase().replace(/[^a-z0-9]/g, '')}@educongo.cg`;
+        }
+      }
+
+      // Real Supabase API call: signInWithPassword
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: password,
+      });
+
+      if (error) {
+        console.warn('Supabase signInWithPassword returned error:', error.message);
+        const lowerErrMsg = (error.message || '').toLowerCase();
+
+        // Check if error is due to unconfirmed email
+        if (
+          lowerErrMsg.includes('email not confirmed') ||
+          lowerErrMsg.includes('email_not_confirmed') ||
+          lowerErrMsg.includes('not verified')
+        ) {
+          setRegistrationData((prev) => ({
+            ...prev,
+            workEmail: emailToUse,
+            schoolCode: identifier,
+            isEmailVerified: false,
+          }));
+          setIsLoggedIn(false);
+          setAuthMode('verify_email');
+          return {
+            success: false,
+            error: "Votre adresse e-mail n'a pas encore été confirmée via Supabase. Veuillez valider votre e-mail pour accéder au tableau de bord.",
+          };
+        }
+
+        // Fallback local verify for offline resilience or local store
+        const localCheck = verifySchoolLogin(identifier, password, mode);
+        if (localCheck.success && localCheck.account) {
+          handleLoginSuccess({
+            name: localCheck.account.schoolName,
+            city: localCheck.account.city,
+            code: localCheck.account.schoolCode,
+            slogan: localCheck.account.slogan,
+            logoUrl: localCheck.account.logoUrl,
+            subdomain: localCheck.account.subdomain,
+          });
+          return { success: true };
+        } else if (localCheck.error === 'EMAIL_NOT_VERIFIED' && localCheck.account) {
+          setRegistrationData((prev) => ({
+            ...prev,
+            schoolName: localCheck.account!.schoolName,
+            schoolCode: localCheck.account!.schoolCode,
+            workEmail: localCheck.account!.workEmail,
+            isEmailVerified: false,
+          }));
+          setIsLoggedIn(false);
+          setAuthMode('verify_email');
+          return {
+            success: false,
+            error: localCheck.errorMessage || "Veuillez valider votre e-mail pour accéder au tableau de bord.",
+          };
+        }
+
+        return {
+          success: false,
+          error:
+            error.message === 'Invalid login credentials'
+              ? 'Identifiant ou mot de passe incorrect.'
+              : error.message,
+        };
+      }
+
+      if (data?.session?.user) {
+        const user = data.session.user;
+        const isConfirmed = Boolean(
+          user.email_confirmed_at ||
+          user.confirmed_at ||
+          user.user_metadata?.email_verified ||
+          (user.email && isEmailAlreadyVerified(user.email))
+        );
+
+        const metadata = user.user_metadata || {};
+        const schoolInfo = {
+          name: metadata.school_name || metadata.schoolName || 'Établissement Scolaire',
+          city: metadata.city || 'Brazzaville',
+          code: metadata.school_code || metadata.schoolCode || 'CG-2024',
+          slogan: metadata.slogan || 'Discipline - Travail - Succès',
+          logoUrl: metadata.logo_url || metadata.logoUrl || '',
+          subdomain: metadata.subdomain || 'mon-ecole',
+        };
+
+        if (!isConfirmed) {
+          setRegistrationData((prev) => ({
+            ...prev,
+            schoolName: schoolInfo.name,
+            schoolCode: schoolInfo.code,
+            workEmail: user.email || emailToUse,
+            isEmailVerified: false,
+          }));
+          setIsLoggedIn(false);
+          setAuthMode('verify_email');
+          return {
+            success: false,
+            error: "Accès refusé : votre adresse e-mail doit être confirmée avant de pouvoir accéder au tableau de bord.",
+          };
+        }
+
+        handleLoginSuccess(schoolInfo);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Session non disponible.' };
+    } catch (err: any) {
+      console.error('Supabase signIn error:', err);
+      return { success: false, error: err.message || 'Erreur lors de la connexion.' };
+    }
+  };
+
+  /**
+   * Real Supabase Authentication: signUp
+   */
+  const handleSignUpWithSupabase = async (
+    formData: SchoolRegistrationData
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const emailToUse = (
+        formData.workEmail ||
+        formData.personalEmail ||
+        `${formData.schoolCode.toLowerCase()}@educongo.cg`
+      )
+        .trim()
+        .toLowerCase();
+      const passwordToUse = formData.password || 'EduCongo2024!';
+
+      // Real Supabase API call: signUp
+      const { data, error } = await supabase.auth.signUp({
+        email: emailToUse,
+        password: passwordToUse,
+        options: {
+          data: {
+            school_name: formData.schoolName,
+            school_code: formData.schoolCode,
+            school_type: formData.schoolType,
+            department: formData.department,
+            city: formData.city,
+            arrondissement: formData.arrondissement,
+            director_name: formData.directorName,
+            admin_role: formData.adminRole,
+            admin_full_name: formData.adminFullName,
+            work_phone: formData.workPhone,
+            personal_phone: formData.personalPhone,
+            slogan: formData.slogan || 'Discipline - Travail - Succès',
+            logo_url: formData.logoUrl || '',
+            subdomain: formData.subdomain || '',
+          },
+        },
+      });
+
+      if (error) {
+        console.warn('Supabase signUp error notice:', error.message);
+      }
+
+      // Persist to registered accounts store with isEmailVerified: false
+      saveRegisteredAccount({
+        ...formData,
+        isEmailVerified: false,
+      });
+
+      // Send verification code
+      await sendEmailVerificationCode(emailToUse, formData.schoolName);
+
+      setRegistrationData({
+        ...formData,
+        workEmail: emailToUse,
+        isEmailVerified: false,
+      });
+
+      setCurrentSchool({
+        name: formData.schoolName,
+        city: formData.city,
+        code: formData.schoolCode,
+        slogan: formData.slogan || 'Discipline - Travail - Succès',
+        logoUrl: formData.logoUrl || '',
+        subdomain: formData.subdomain || '',
+      });
+
+      // Redirect immediately to Email Verification step. Dashboard is strictly blocked.
+      setIsLoggedIn(false);
+      setAuthMode('verify_email');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Supabase signUp exception:', err);
+      saveRegisteredAccount({
+        ...formData,
+        isEmailVerified: false,
+      });
+      setIsLoggedIn(false);
+      setAuthMode('verify_email');
+      return { success: true };
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Supabase signOut error:', err);
+    }
     setIsLoggedIn(false);
     setCurrentScreen('auth');
     setAuthMode('login');
@@ -187,12 +617,14 @@ export function App() {
       <Header
         currentScreen={currentScreen}
         onNavigate={(screen) => setCurrentScreen(screen)}
+        canGoBack={canGoBack}
+        onGoBack={handleUniversalBack}
         isLoggedIn={isLoggedIn}
         schoolName={currentSchool.name}
         onLogout={handleLogout}
         onOpenAbout={() => setIsAboutModalOpen(true)}
         onOpenHelp={() => setIsHelpModalOpen(true)}
-        onOpenDevPanel={() => setCurrentScreen('dev_panel')}
+        onOpenDevPanel={handleOpenDevPanel}
         // Global search handlers
         onSelectStudent={handleSelectStudentFromSearch}
         onSelectStaff={handleSelectStaffFromSearch}
@@ -298,7 +730,9 @@ export function App() {
                         setAuthMode('register_step1');
                       }}
                       onLoginSuccess={handleLoginSuccess}
+                      onLoginWithSupabase={handleLoginWithSupabase}
                       onForgotPassword={() => setIsForgotModalOpen(true)}
+                      onOpenDevPanel={handleOpenDevPanel}
                     />
                   )}
 
@@ -325,9 +759,26 @@ export function App() {
                     <RegisterStep3
                       formData={registrationData}
                       onChange={handleRegistrationChange}
-                      onSubmit={() => setAuthMode('register_success')}
+                      onSubmit={() => setAuthMode('verify_email')}
+                      onRegisterWithSupabase={handleSignUpWithSupabase}
                       onBack={() => setAuthMode('register_step2')}
                       onSwitchToLogin={() => setAuthMode('login')}
+                    />
+                  )}
+
+                  {authMode === 'verify_email' && (
+                    <EmailVerificationCard
+                      email={registrationData.workEmail || registrationData.personalEmail || `${registrationData.schoolCode.toLowerCase()}@educongo.cg`}
+                      schoolName={registrationData.schoolName || currentSchool.name || "Votre établissement"}
+                      schoolCode={registrationData.schoolCode || currentSchool.code || ""}
+                      onVerificationSuccess={() => {
+                        markAccountEmailVerified(registrationData.workEmail);
+                        if (registrationData.schoolCode) markAccountEmailVerified(registrationData.schoolCode);
+                        setRegistrationData((prev) => ({ ...prev, isEmailVerified: true }));
+                        setAuthMode('register_success');
+                      }}
+                      onSwitchToLogin={() => setAuthMode('login')}
+                      onOpenHelp={() => setIsHelpModalOpen(true)}
                     />
                   )}
 
@@ -336,6 +787,17 @@ export function App() {
                       formData={registrationData}
                       onReturnHome={() => setAuthMode('login')}
                       onEnterDashboard={() => {
+                        const isConfirmed = Boolean(
+                          registrationData.isEmailVerified ||
+                          (registrationData.workEmail && isEmailAlreadyVerified(registrationData.workEmail)) ||
+                          (registrationData.schoolCode && isEmailAlreadyVerified(registrationData.schoolCode))
+                        );
+
+                        if (!isConfirmed) {
+                          setAuthMode('verify_email');
+                          return;
+                        }
+
                         setCurrentSchool({
                           name: registrationData.schoolName || "Lycée Savorgnan de Brazza",
                           city: registrationData.city || 'Brazzaville',
@@ -372,6 +834,7 @@ export function App() {
       <Footer
         onOpenAbout={() => setIsAboutModalOpen(true)}
         onOpenHelp={() => setIsHelpModalOpen(true)}
+        onOpenDevPanel={handleOpenDevPanel}
       />
 
       {/* Modals */}
@@ -427,46 +890,14 @@ export function App() {
         city={currentSchool.city}
       />
 
-      {/* Floating Demo & Developer Quick Switcher */}
-      <DemoQuickSwitcher
-        onSelectSchool={(sch) => {
-          setCurrentSchool({
-            name: sch.name,
-            city: sch.city,
-            code: sch.code,
-            slogan: sch.slogan || 'Discipline - Travail - Succès',
-            logoUrl: sch.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
-            subdomain: sch.subdomain || 'mon-ecole',
-          });
-          setIsLoggedIn(true);
-          setCurrentScreen('dashboard');
-        }}
-        onOpenDevPanel={() => {
+      {/* Developer Authenticated Access Modal */}
+      <DevAuthModal
+        isOpen={isDevAuthModalOpen}
+        onClose={() => setIsDevAuthModalOpen(false)}
+        onDevAuthenticated={() => {
+          setIsDevAuthenticated(true);
+          setIsDevAuthModalOpen(false);
           setCurrentScreen('dev_panel');
-        }}
-        onOpenPortal={(sch) => {
-          if (sch) {
-            setCurrentSchool({
-              name: sch.name,
-              city: sch.city,
-              code: sch.code,
-              slogan: sch.slogan || 'Discipline - Travail - Succès',
-              logoUrl: sch.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
-              subdomain: sch.subdomain || 'mon-ecole',
-            });
-          }
-          setCurrentScreen('subdomain_portal');
-        }}
-        onFillRegistrationForm={(sampleData) => {
-          setRegistrationData(sampleData);
-          setCurrentScreen('auth');
-          setAuthMode('register_step1');
-        }}
-        onNavigateScreen={(scr) => {
-          setCurrentScreen(scr);
-          if (scr === 'dashboard') {
-            setIsLoggedIn(true);
-          }
         }}
       />
     </div>

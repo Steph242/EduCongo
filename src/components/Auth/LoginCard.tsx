@@ -5,8 +5,10 @@ import { RegisteredSchoolAccount } from '../../types';
 
 interface LoginCardProps {
   onSwitchToRegister: () => void;
-  onLoginSuccess: (schoolInfo?: { name: string; city: string; code: string }) => void;
+  onLoginSuccess: (schoolInfo?: { name: string; city: string; code: string; slogan?: string; logoUrl?: string; subdomain?: string }) => void;
+  onLoginWithSupabase?: (identifier: string, password: string, mode: 'phone' | 'email') => Promise<{ success: boolean; error?: string }>;
   onForgotPassword: () => void;
+  onOpenDevPanel?: () => void;
 }
 
 type LoginMode = 'phone' | 'email';
@@ -14,7 +16,9 @@ type LoginMode = 'phone' | 'email';
 export const LoginCard: React.FC<LoginCardProps> = ({
   onSwitchToRegister,
   onLoginSuccess,
+  onLoginWithSupabase,
   onForgotPassword,
+  onOpenDevPanel,
 }) => {
   const [loginMode, setLoginMode] = useState<LoginMode>('phone');
   
@@ -79,7 +83,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
     };
   }, [loginMode, phone, emailOrCode, password]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validation.isAllValid) {
       setShowErrors(true);
@@ -93,11 +97,21 @@ export const LoginCard: React.FC<LoginCardProps> = ({
     setErrorMsg('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const identifier = loginMode === 'phone' ? phone : emailOrCode;
-      const result = verifySchoolLogin(identifier, password, loginMode);
+    const identifier = loginMode === 'phone' ? phone : emailOrCode;
 
+    try {
+      if (onLoginWithSupabase) {
+        const res = await onLoginWithSupabase(identifier, password, loginMode);
+        setIsLoading(false);
+        if (!res.success) {
+          setErrorMsg(res.error || 'Identifiants ou mot de passe invalides.');
+        }
+        return;
+      }
+
+      // Local fallback verification
+      const result = verifySchoolLogin(identifier, password, loginMode);
+      setIsLoading(false);
       if (!result.success || !result.account) {
         setErrorMsg(result.errorMessage || 'Identifiants ou mot de passe invalides.');
         return;
@@ -107,8 +121,14 @@ export const LoginCard: React.FC<LoginCardProps> = ({
         name: result.account.schoolName,
         city: result.account.city,
         code: result.account.schoolCode,
+        slogan: result.account.slogan,
+        logoUrl: result.account.logoUrl,
+        subdomain: result.account.subdomain,
       });
-    }, 600);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Une erreur de connexion est survenue.');
+    }
   };
 
   return (
@@ -434,7 +454,31 @@ export const LoginCard: React.FC<LoginCardProps> = ({
       </form>
 
       {/* Accounts information footer */}
-      <div className="mt-7 pt-5 border-t border-white/10">
+      <div className="mt-7 pt-5 border-t border-white/10 space-y-4">
+        {onOpenDevPanel && (
+          <button
+            type="button"
+            onClick={onOpenDevPanel}
+            className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900/80 border border-indigo-500/40 hover:border-indigo-400 text-indigo-200 hover:text-white transition-all flex items-center justify-between text-xs group cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.15)]"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[15px]">terminal</span>
+              </span>
+              <div className="text-left">
+                <div className="font-bold flex items-center gap-1.5 text-slate-200 group-hover:text-indigo-200">
+                  <span>Console Développeur</span>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">Super-Admin</span>
+                </div>
+                <div className="text-[11px] text-slate-400">Accès superviseur MEPPSA & démo</div>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[18px] text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+              arrow_forward
+            </span>
+          </button>
+        )}
+
         {registeredAccounts.length > 0 ? (
           <div>
             <p className="text-[12px] text-slate-400 font-medium mb-3 flex items-center justify-between">

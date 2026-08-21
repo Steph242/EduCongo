@@ -12,6 +12,13 @@ import {
   INITIAL_MICROSERVICES,
   INITIAL_FEATURE_FLAGS,
 } from '../../services/devControlService';
+import {
+  getDeveloperAccounts,
+  createDeveloperAccount,
+  deleteDeveloperAccount,
+  getCurrentDeveloperAccount,
+  DeveloperAccount,
+} from '../../services/devAccountService';
 import { CONGO_DEPARTMENTS, CONGO_CITIES } from '../../data/mockData';
 
 interface DevControlPanelProps {
@@ -20,7 +27,7 @@ interface DevControlPanelProps {
   onOpenPortal: (school: RegisteredSchoolAccount) => void;
 }
 
-type DevTab = 'schools' | 'audit' | 'microservices' | 'console' | 'broadcast' | 'sandbox';
+type DevTab = 'schools' | 'dev_accounts' | 'audit' | 'microservices' | 'console' | 'broadcast' | 'sandbox';
 
 export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   onBackToApp,
@@ -29,9 +36,28 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<DevTab>('schools');
   const [schools, setSchools] = useState<RegisteredSchoolAccount[]>(getRegisteredSchools);
+  const [devAccounts, setDevAccounts] = useState<DeveloperAccount[]>(getDeveloperAccounts);
+  const [currentDev, setCurrentDev] = useState<DeveloperAccount>(getCurrentDeveloperAccount);
   const [auditLogs, setAuditLogs] = useState(getAuditLogs);
   const [microservices, setMicroservices] = useState<MicroserviceHealth[]>(INITIAL_MICROSERVICES);
   const [featureFlags, setFeatureFlags] = useState<DeveloperFeatureFlag[]>(INITIAL_FEATURE_FLAGS);
+
+  // Filters for dev accounts
+  const [devSearchQuery, setDevSearchQuery] = useState('');
+  const [devRoleFilter, setDevRoleFilter] = useState('all');
+  const [isAddDevModalOpen, setIsAddDevModalOpen] = useState(false);
+  const [newDevForm, setNewDevForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'Super-Administrateur Système',
+    department: 'MEPPSA - Direction des Systèmes d’Information (DSI)',
+    phone: '+242 06 ',
+    securityKey: 'MEPPSA-DEV-2024',
+  });
+  const [devActionFeedback, setDevActionFeedback] = useState<string | null>(null);
+
 
   // Filters for schools table
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +102,74 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   const refreshData = () => {
     setSchools(getRegisteredSchools());
     setAuditLogs(getAuditLogs());
+    setDevAccounts(getDeveloperAccounts());
+    setCurrentDev(getCurrentDeveloperAccount());
+  };
+
+  // Filtered developer accounts
+  const filteredDevAccounts = useMemo(() => {
+    return devAccounts.filter((acc) => {
+      const matchesSearch =
+        acc.fullName.toLowerCase().includes(devSearchQuery.toLowerCase()) ||
+        acc.email.toLowerCase().includes(devSearchQuery.toLowerCase()) ||
+        (acc.department && acc.department.toLowerCase().includes(devSearchQuery.toLowerCase())) ||
+        (acc.phone && acc.phone.includes(devSearchQuery));
+
+      const matchesRole = devRoleFilter === 'all' || acc.role === devRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [devAccounts, devSearchQuery, devRoleFilter]);
+
+  const handleCreateDevSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDevActionFeedback(null);
+
+    if (newDevForm.password !== newDevForm.confirmPassword) {
+      alert('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    const res = await createDeveloperAccount({
+      fullName: newDevForm.fullName,
+      email: newDevForm.email,
+      password: newDevForm.password,
+      role: newDevForm.role,
+      department: newDevForm.department,
+      phone: newDevForm.phone,
+      securityKey: newDevForm.securityKey,
+    });
+
+    if (res.success && res.account) {
+      setDevActionFeedback(`Compte développeur pour "${res.account.fullName}" créé avec succès !`);
+      setIsAddDevModalOpen(false);
+      setNewDevForm({
+        fullName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        role: 'Super-Administrateur Système',
+        department: 'MEPPSA - Direction des Systèmes d’Information (DSI)',
+        phone: '+242 06 ',
+        securityKey: 'MEPPSA-DEV-2024',
+      });
+      refreshData();
+      setTimeout(() => setDevActionFeedback(null), 5000);
+    } else {
+      alert(res.message || 'Erreur lors de la création du compte développeur.');
+    }
+  };
+
+  const handleDeleteDev = (devId: string, devName: string) => {
+    if (window.confirm(`Confirmer la révocation du compte développeur de "${devName}" ?`)) {
+      const ok = deleteDeveloperAccount(devId);
+      if (ok) {
+        setDevActionFeedback(`Compte développeur "${devName}" révoqué avec succès.`);
+        refreshData();
+        setTimeout(() => setDevActionFeedback(null), 5000);
+      } else {
+        alert('Impossible de révoquer un compte développeur racine (Master).');
+      }
+    }
   };
 
   // National metrics
@@ -306,9 +400,23 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Active Dev Profile */}
+          <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-xs">
+            <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-[11px] shadow-sm">
+              {currentDev.fullName ? currentDev.fullName.charAt(0) : 'D'}
+            </div>
+            <div>
+              <div className="font-bold text-white leading-tight flex items-center gap-1.5">
+                <span>{currentDev.fullName}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              </div>
+              <div className="text-[10px] text-indigo-300 font-mono truncate max-w-[180px]">{currentDev.email}</div>
+            </div>
+          </div>
+
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            CLUSTER CONGO BZV: CONNECTÉ (LATENCE 18ms)
+            CLUSTER BZV: CONNECTÉ (18ms)
           </div>
 
           <button
@@ -399,6 +507,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
         <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10 custom-scrollbar">
           {[
             { id: 'schools', label: 'Établissements Inscrits', icon: 'domain', count: schools.length },
+            { id: 'dev_accounts', label: 'Comptes Développeurs & Super-Admins', icon: 'admin_panel_settings', count: devAccounts.length },
             { id: 'audit', label: 'Journal d’Audit & Sécurité', icon: 'security', count: auditLogs.length },
             { id: 'microservices', label: 'Microservices & Passerelles', icon: 'hub', count: microservices.length },
             { id: 'console', label: 'Console SQL & Feature Flags', icon: 'code' },
@@ -517,7 +626,30 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-normal">
-                    {filteredSchools.map((s) => (
+                    {filteredSchools.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 px-4 text-center">
+                          <div className="max-w-md mx-auto space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center mx-auto">
+                              <span className="material-symbols-outlined text-[26px]">domain_disabled</span>
+                            </div>
+                            <div className="font-bold text-white text-sm">Aucun établissement enregistré</div>
+                            <p className="text-xs text-slate-400">
+                              L'application est en production réelle. Les établissements apparaîtront ici dès leur inscription officielle sur le portail national.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setIsAddSchoolModalOpen(true)}
+                              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                              Enregistrer un établissement
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSchools.map((s) => (
                       <tr key={s.id} className="hover:bg-white/[0.04] transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
@@ -616,9 +748,248 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB: DEVELOPER ACCOUNTS MANAGEMENT ==================== */}
+        {activeTab === 'dev_accounts' && (
+          <div className="space-y-5">
+            {/* Feedback alert */}
+            {devActionFeedback && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span className="font-semibold">{devActionFeedback}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDevActionFeedback(null)}
+                  className="text-emerald-400 hover:text-white p-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+            )}
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Total Comptes Dev</span>
+                  <span className="material-symbols-outlined text-indigo-400 text-[20px]">admin_panel_settings</span>
+                </div>
+                <div className="text-2xl font-black text-white">{devAccounts.length}</div>
+                <div className="text-[11px] text-indigo-300 font-semibold mt-1">
+                  Super-Admins & Ingénieurs MEPPSA
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Comptes Racine (Master)</span>
+                  <span className="material-symbols-outlined text-purple-400 text-[20px]">lock</span>
+                </div>
+                <div className="text-2xl font-black text-purple-300">
+                  {devAccounts.filter((a) => a.isCustom === false).length}
+                </div>
+                <div className="text-[11px] text-purple-400 font-semibold mt-1">
+                  dev@educongo.cg & admin@educongo.cg
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-xs font-medium">Comptes Créés / Personnalisés</span>
+                  <span className="material-symbols-outlined text-emerald-400 text-[20px]">person_add</span>
+                </div>
+                <div className="text-2xl font-black text-emerald-400">
+                  {devAccounts.filter((a) => a.isCustom !== false).length}
+                </div>
+                <div className="text-[11px] text-emerald-400 font-semibold mt-1">
+                  Habilités avec clé de sécurité
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30">
+                <div className="flex items-center justify-between text-indigo-300 mb-1">
+                  <span className="text-xs font-medium">Session Active</span>
+                  <span className="material-symbols-outlined text-emerald-400 text-[20px]">verified</span>
+                </div>
+                <div className="text-sm font-bold text-white truncate">{currentDev.fullName}</div>
+                <div className="text-[11px] text-emerald-300 font-mono truncate mt-0.5">
+                  {currentDev.email}
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Action Header */}
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[300px]">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, e-mail, département..."
+                    value={devSearchQuery}
+                    onChange={(e) => setDevSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white placeholder-slate-500 focus:border-indigo-400 outline-none"
+                  />
+                </div>
+
+                {/* Role Filter */}
+                <select
+                  value={devRoleFilter}
+                  onChange={(e) => setDevRoleFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-xs text-white outline-none focus:border-indigo-400"
+                >
+                  <option value="all">Tous les rôles ({devAccounts.length})</option>
+                  <option value="Super-Administrateur Système">Super-Administrateur Système</option>
+                  <option value="Ingénieur Cloud & DevOps">Ingénieur Cloud & DevOps</option>
+                  <option value="Développeur Full-Stack">Développeur Full-Stack</option>
+                  <option value="Inspecteur DSI MEPPSA">Inspecteur DSI MEPPSA</option>
+                  <option value="Auditeur & Sécurité">Auditeur & Sécurité</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDevModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:opacity-90 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">person_add</span>
+                  Nouveau Compte Développeur
+                </button>
+              </div>
+            </div>
+
+            {/* Developer Accounts Table */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950/60 border-b border-white/10 text-slate-400 uppercase font-semibold text-[11px]">
+                    <tr>
+                      <th className="py-3.5 px-4">Ingénieur / Administrateur</th>
+                      <th className="py-3.5 px-4">E-mail & Téléphone</th>
+                      <th className="py-3.5 px-4">Rôle Technique</th>
+                      <th className="py-3.5 px-4">Service / Ministère</th>
+                      <th className="py-3.5 px-4">Clé Habilitation</th>
+                      <th className="py-3.5 px-4">Date de Création</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-normal">
+                    {filteredDevAccounts.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-10 px-4 text-center text-slate-400">
+                          Aucun compte développeur correspondant aux filtres.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredDevAccounts.map((acc) => (
+                        <tr key={acc.id} className="hover:bg-white/[0.04] transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600/30 to-purple-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 font-bold text-sm shrink-0">
+                                {acc.fullName.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-bold text-white flex items-center gap-1.5">
+                                  <span>{acc.fullName}</span>
+                                  {acc.isCustom === false ? (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-400/40 font-mono font-semibold">
+                                      MASTER ROOT
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-mono font-semibold">
+                                      VÉRIFIÉ DSI
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">{acc.id}</div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="font-mono text-indigo-300 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px] text-slate-400">alternate_email</span>
+                              <span>{acc.email}</span>
+                            </div>
+                            {acc.phone && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">phone</span>
+                                <span>{acc.phone}</span>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold">
+                              {acc.role}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-slate-300 text-[11px]">
+                            {acc.department || 'MEPPSA - DSI'}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-[11px] text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              {acc.securityKey || 'MEPPSA-DEV-2024'}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-slate-400 text-[11px]">
+                            <div>{new Date(acc.createdAt).toLocaleDateString('fr-FR')}</div>
+                            {acc.lastLoginAt && (
+                              <div className="text-[10px] text-slate-500">
+                                Dernier accès: {new Date(acc.lastLoginAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            {acc.isCustom !== false ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDev(acc.id, acc.fullName)}
+                                title="Révoquer le compte développeur"
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">Protégé</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Documentation on Security Keys */}
+            <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-400 text-[22px] shrink-0 mt-0.5">
+                key
+              </span>
+              <div className="text-xs space-y-1">
+                <div className="font-bold text-white">Protocole d'Habilitation Développeur & Administrateur Système</div>
+                <p className="text-slate-400">
+                  La création de comptes développeurs est protégée par une clé d'habilitation nationale délivrée par la DSI du MEPPSA (<code className="text-amber-300 font-bold">MEPPSA-DEV-2024</code>). Tout nouveau compte créé hérite des droits de surveillance, audit, diffusion d'alertes et accès direct aux consoles des 12 départements de la République du Congo.
+                </p>
               </div>
             </div>
           </div>
@@ -1127,6 +1498,175 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold cursor-pointer shadow-md"
                 >
                   Enregistrer & Activer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: ADD DEVELOPER ACCOUNT ==================== */}
+      {isAddDevModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+          <div className="bg-slate-950/95 border border-indigo-500/30 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar relative">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500"></div>
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 pt-1">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
+                  <span className="material-symbols-outlined text-[22px]">person_add</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Créer un Compte Développeur</h3>
+                  <p className="text-xs text-slate-400">Habilitation Super-Admin & Ingénieur Système</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddDevModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDevSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Nom Complet de l'Ingénieur <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newDevForm.fullName}
+                  onChange={(e) => setNewDevForm({ ...newDevForm, fullName: e.target.value })}
+                  placeholder="Ex: M. Bienvenu MOUKOKO ou Brealyston"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none focus:border-indigo-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  E-mail Professionnel / Développeur <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newDevForm.email}
+                  onChange={(e) => setNewDevForm({ ...newDevForm, email: e.target.value })}
+                  placeholder="Ex: dev@educongo.cg ou admin@educongo.cg"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none focus:border-indigo-400 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Rôle Technique <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={newDevForm.role}
+                    onChange={(e) => setNewDevForm({ ...newDevForm, role: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none"
+                  >
+                    <option value="Super-Administrateur Système">Super-Administrateur Système</option>
+                    <option value="Ingénieur Cloud & DevOps">Ingénieur Cloud & DevOps</option>
+                    <option value="Développeur Full-Stack">Développeur Full-Stack</option>
+                    <option value="Inspecteur DSI MEPPSA">Inspecteur DSI MEPPSA</option>
+                    <option value="Auditeur & Sécurité">Auditeur & Sécurité</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Service / Pôle</label>
+                  <input
+                    type="text"
+                    value={newDevForm.department}
+                    onChange={(e) => setNewDevForm({ ...newDevForm, department: e.target.value })}
+                    placeholder="MEPPSA - DSI"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Mot de Passe <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newDevForm.password}
+                    onChange={(e) => setNewDevForm({ ...newDevForm, password: e.target.value })}
+                    placeholder="Min. 6 caractères"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Confirmation <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newDevForm.confirmPassword}
+                    onChange={(e) => setNewDevForm({ ...newDevForm, confirmPassword: e.target.value })}
+                    placeholder="Confirmez le mot de passe"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="font-medium text-slate-300">
+                    Clé d'habilitation de sécurité nationale <span className="text-rose-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setNewDevForm({ ...newDevForm, securityKey: 'MEPPSA-DEV-2024' })}
+                    className="text-[10px] text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    Utiliser MEPPSA-DEV-2024
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={newDevForm.securityKey}
+                  onChange={(e) => setNewDevForm({ ...newDevForm, securityKey: e.target.value.toUpperCase() })}
+                  placeholder="MEPPSA-DEV-2024"
+                  className="w-full px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 outline-none font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Téléphone d'Astreinte</label>
+                <input
+                  type="tel"
+                  value={newDevForm.phone}
+                  onChange={(e) => setNewDevForm({ ...newDevForm, phone: e.target.value })}
+                  placeholder="+242 06 600 00 00"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDevModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-white/15 text-slate-300 hover:bg-white/5 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold cursor-pointer shadow-md flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">verified_user</span>
+                  Créer le Compte Développeur
                 </button>
               </div>
             </form>
