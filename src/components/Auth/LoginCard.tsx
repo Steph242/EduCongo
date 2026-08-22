@@ -8,7 +8,6 @@ interface LoginCardProps {
   onLoginSuccess: (schoolInfo?: { name: string; city: string; code: string; slogan?: string; logoUrl?: string; subdomain?: string }) => void;
   onLoginWithSupabase?: (identifier: string, password: string, mode: 'phone' | 'email') => Promise<{ success: boolean; error?: string }>;
   onForgotPassword: () => void;
-  onOpenDevPanel?: () => void;
 }
 
 type LoginMode = 'phone' | 'email';
@@ -18,7 +17,6 @@ export const LoginCard: React.FC<LoginCardProps> = ({
   onLoginSuccess,
   onLoginWithSupabase,
   onForgotPassword,
-  onOpenDevPanel,
 }) => {
   const [loginMode, setLoginMode] = useState<LoginMode>('phone');
   
@@ -455,38 +453,14 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
       {/* Accounts information footer */}
       <div className="mt-7 pt-5 border-t border-white/10 space-y-4">
-        {onOpenDevPanel && (
-          <button
-            type="button"
-            onClick={onOpenDevPanel}
-            className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900/80 border border-indigo-500/40 hover:border-indigo-400 text-indigo-200 hover:text-white transition-all flex items-center justify-between text-xs group cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.15)]"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[15px]">terminal</span>
-              </span>
-              <div className="text-left">
-                <div className="font-bold flex items-center gap-1.5 text-slate-200 group-hover:text-indigo-200">
-                  <span>Console Développeur</span>
-                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">Super-Admin</span>
-                </div>
-                <div className="text-[11px] text-slate-400">Accès superviseur MEPPSA & démo</div>
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-[18px] text-indigo-400 group-hover:translate-x-0.5 transition-transform">
-              arrow_forward
-            </span>
-          </button>
-        )}
-
         {registeredAccounts.length > 0 ? (
           <div>
             <p className="text-[12px] text-slate-400 font-medium mb-3 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-emerald-400">verified</span>
-                Établissements enregistrés ({registeredAccounts.length}) :
+                Comptes autorisés :
               </span>
-              <span className="text-[11px] text-emerald-400/80">Comptes réels</span>
+              <span className="text-[11px] text-emerald-400/80">Accès Direct</span>
             </p>
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
               {registeredAccounts.map((acc) => (
@@ -497,7 +471,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
                     if (loginMode === 'phone') {
                       setPhone(acc.workPhone || acc.personalPhone);
                     } else {
-                      setEmailOrCode(acc.schoolCode || acc.workEmail);
+                      setEmailOrCode(acc.workEmail || acc.schoolCode);
                     }
                     if (acc.password) {
                       setPassword(acc.password);
@@ -512,7 +486,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
                       {acc.schoolName}
                     </div>
                     <div className="text-slate-400 text-[11px] truncate">
-                      {acc.city} • Code: {acc.schoolCode} • Tél: {acc.workPhone}
+                      {acc.adminFullName || acc.directorName} • {acc.workEmail}
                     </div>
                   </div>
                   <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0">

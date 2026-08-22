@@ -21,6 +21,7 @@ interface AttendanceChartProps {
   schoolName?: string;
   cityName?: string;
   schoolCode?: string;
+  studentsCount?: number;
 }
 
 type ChartType = 'rate' | 'counts' | 'composed';
@@ -29,6 +30,7 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
   schoolName = "Lycée d'Excellence",
   cityName = "Brazzaville",
   schoolCode = "BZV-24-X8B",
+  studentsCount = 0,
 }) => {
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [chartType, setChartType] = useState<ChartType>('rate');
@@ -160,7 +162,19 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
 
   // Aggregate monthly stats
   const stats = useMemo(() => {
-    if (chartData.length === 0) return { avgRate: 0, totalPresent: 0, totalAbsent: 0, totalLate: 0, bestDay: null, worstDay: null };
+    if (studentsCount === 0 || chartData.length === 0) {
+      return {
+        avgRate: '0.0',
+        totalPresent: 0,
+        totalAbsent: 0,
+        totalLate: 0,
+        bestDay: null,
+        worstDay: null,
+        totalJustified: 0,
+        totalUnjustified: 0,
+        daysCount: 0,
+      };
+    }
 
     const totalRate = chartData.reduce((acc, d) => acc + d.rate, 0);
     const avgRate = (totalRate / chartData.length).toFixed(1);
@@ -186,7 +200,7 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
       totalUnjustified,
       daysCount: chartData.length,
     };
-  }, [chartData]);
+  }, [chartData, studentsCount]);
 
   // Custom Frosted Glass Tooltip for Recharts
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -431,126 +445,138 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
 
       {/* Main Recharts Container */}
       <div className="w-full h-[340px] sm:h-[380px] pt-2">
-        <ResponsiveContainer width="100%" height="100%">
-          {chartType === 'rate' ? (
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="presenceRateGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.6} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <YAxis
-                domain={[90, 100]}
-                unit="%"
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine
-                y={95}
-                stroke="#f59e0b"
-                strokeDasharray="4 4"
-                label={{ value: 'Seuil MEPPSA (95%)', fill: '#f59e0b', fontSize: 10, position: 'insideTopLeft' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="rate"
-                name="Taux d'assiduité (%)"
-                stroke="#10b981"
-                strokeWidth={3}
-                fillOpacity={1}
-                fill="url(#presenceRateGrad)"
-                activeDot={{ r: 6, fill: '#34d399', stroke: '#fff', strokeWidth: 2 }}
-              />
-            </AreaChart>
-          ) : chartType === 'counts' ? (
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <YAxis
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ paddingTop: 10, fontSize: 12, color: '#94a3b8' }}
-                iconType="circle"
-              />
-              <Bar dataKey="present" name="Présents" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
-              <Bar dataKey="late" name="Retards" fill="#f59e0b" radius={[0, 0, 0, 0]} stackId="a" />
-              <Bar dataKey="absent" name="Absents" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
-            </BarChart>
-          ) : (
-            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="composedPresenceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <YAxis
-                yAxisId="left"
-                stroke="#94a3b8"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                domain={[90, 100]}
-                unit="%"
-                stroke="#34d399"
-                fontSize={11}
-                tickLine={false}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                wrapperStyle={{ paddingTop: 10, fontSize: 12, color: '#94a3b8' }}
-                iconType="circle"
-              />
-              <Bar yAxisId="left" dataKey="present" name="Élèves Présents" fill="#6366f1" radius={[4, 4, 0, 0]} fillOpacity={0.7} />
-              <Bar yAxisId="left" dataKey="absent" name="Élèves Absents" fill="#ef4444" radius={[4, 4, 0, 0]} fillOpacity={0.8} />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="rate"
-                name="Taux d'Assiduité (%)"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{ r: 4, fill: '#10b981' }}
-              />
-            </ComposedChart>
-          )}
-        </ResponsiveContainer>
+        {studentsCount === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+              <span className="material-symbols-outlined text-[28px]">analytics</span>
+            </div>
+            <h4 className="font-bold text-white text-base mb-1">Aucune donnée d'assiduité enregistrée</h4>
+            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+              Cet établissement démarre avec des compteurs à zéro. Dès l'inscription des premiers élèves et la validation de l'appel quotidien, les graphiques d'assiduité se généreront automatiquement en temps réel.
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === 'rate' ? (
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="presenceRateGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <YAxis
+                  domain={[90, 100]}
+                  unit="%"
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine
+                  y={95}
+                  stroke="#f59e0b"
+                  strokeDasharray="4 4"
+                  label={{ value: 'Seuil MEPPSA (95%)', fill: '#f59e0b', fontSize: 10, position: 'insideTopLeft' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="rate"
+                  name="Taux d'assiduité (%)"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#presenceRateGrad)"
+                  activeDot={{ r: 6, fill: '#34d399', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            ) : chartType === 'counts' ? (
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  wrapperStyle={{ paddingTop: 10, fontSize: 12, color: '#94a3b8' }}
+                  iconType="circle"
+                />
+                <Bar dataKey="present" name="Présents" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
+                <Bar dataKey="late" name="Retards" fill="#f59e0b" radius={[0, 0, 0, 0]} stackId="a" />
+                <Bar dataKey="absent" name="Absents" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
+              </BarChart>
+            ) : (
+              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="composedPresenceGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  domain={[90, 100]}
+                  unit="%"
+                  stroke="#34d399"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  wrapperStyle={{ paddingTop: 10, fontSize: 12, color: '#94a3b8' }}
+                  iconType="circle"
+                />
+                <Bar yAxisId="left" dataKey="present" name="Élèves Présents" fill="#6366f1" radius={[4, 4, 0, 0]} fillOpacity={0.7} />
+                <Bar yAxisId="left" dataKey="absent" name="Élèves Absents" fill="#ef4444" radius={[4, 4, 0, 0]} fillOpacity={0.8} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="rate"
+                  name="Taux d'Assiduité (%)"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#10b981' }}
+                />
+              </ComposedChart>
+            )}
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Footer Insight bar */}

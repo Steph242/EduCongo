@@ -1,9 +1,39 @@
 import { SchoolRegistrationData, RegisteredSchoolAccount } from '../types';
-import { INITIAL_REGISTERED_SCHOOLS } from '../data/mockRegisteredSchools';
 import { registerSchoolWithSupabase } from './supabase';
 
-const STORAGE_KEY = 'educongo_registered_schools_prod';
-const SCHOOL_DATA_STORAGE_KEY_PREFIX = 'educongo_school_data_prod_';
+const STORAGE_KEY = 'educongo_registered_schools_prod_v2';
+const SCHOOL_DATA_STORAGE_KEY_PREFIX = 'educongo_school_data_prod_v2_';
+
+/**
+ * Super Administrator account configured for direct login and system administration
+ */
+export const SUPER_ADMIN_ACCOUNT: RegisteredSchoolAccount = {
+  id: 'SUPER_ADMIN_STEPH',
+  schoolName: 'Super Administration EduCongo (MEPPSA)',
+  schoolCode: 'SUPER-ADMIN-CG',
+  schoolType: 'superadmin',
+  department: 'Brazzaville',
+  city: 'Brazzaville',
+  arrondissement: 'Plateau des 15 Ans',
+  directorName: 'Steph ALONGO',
+  adminFullName: 'Steph ALONGO',
+  adminRole: 'superadmin',
+  workEmail: 'steph.alongo@gmail.com',
+  personalEmail: 'steph.alongo@gmail.com',
+  workPhone: '+242 06 600 00 00',
+  personalPhone: '+242 06 600 00 00',
+  password: 'Verlaine92/Brealy95/',
+  registeredAt: '2024-01-01T00:00:00.000Z',
+  status: 'Actif',
+  isEmailVerified: true,
+  slogan: 'Direction Générale & Supervision Nationale des Établissements',
+  subdomain: 'superadmin',
+  documents: {
+    agrementFile: null,
+    statutsFile: null,
+    identityFile: null,
+  },
+};
 
 /**
  * Normalizes phone numbers for accurate Congolese telecom matching
@@ -23,6 +53,7 @@ export function normalizeCongoPhone(phone: string): string {
 
 /**
  * Retrieves all registered school accounts from persistent storage.
+ * Always includes the super administrator account and newly registered schools.
  */
 export function getRegisteredAccounts(): RegisteredSchoolAccount[] {
   try {
@@ -30,13 +61,17 @@ export function getRegisteredAccounts(): RegisteredSchoolAccount[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        // Ensure super admin is included and no duplicates
+        const filtered = parsed.filter(
+          (acc) => acc.workEmail?.toLowerCase() !== 'steph.alongo@gmail.com'
+        );
+        return [SUPER_ADMIN_ACCOUNT, ...filtered];
       }
     }
   } catch (err) {
     console.error('Error loading registered accounts:', err);
   }
-  return INITIAL_REGISTERED_SCHOOLS;
+  return [SUPER_ADMIN_ACCOUNT];
 }
 
 export interface SchoolCustomData {
@@ -51,7 +86,8 @@ export interface SchoolCustomData {
 
 /**
  * Get school specific operational data.
- * Returns persisted data or clean empty state for genuine administration.
+ * Requirement 3: Every newly registered school is 100% EMPTY by default.
+ * All indicators at 0, no pre-filled classes, no pre-filled students or teachers.
  */
 export function getSchoolData(schoolCode: string): SchoolCustomData {
   const cleanCode = (schoolCode || '').toUpperCase().trim();
@@ -78,15 +114,15 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
     console.error('Error loading school data:', e);
   }
 
-  // Real production school: strictly clean data
+  // 100% Empty state for new schools: Administrator must configure from A to Z
   return {
     isNewlyCreated: true,
     students: [],
     teachers: [],
     payments: [],
     staff: [],
-    classes: ['6ème', '5ème', '4ème', '3ème', 'Seconde', 'Première', 'Terminale'],
-    cycles: ['Collège', 'Lycée'],
+    classes: [],
+    cycles: [],
   };
 }
 
@@ -164,32 +200,7 @@ export function saveRegisteredAccount(data: SchoolRegistrationData): RegisteredS
     students: [],
     teachers: [],
     payments: [],
-    staff: [
-      {
-        id: 'staff_admin_init',
-        matricule: `ADM-${cleanCode}-01`,
-        fullName: data.adminFullName || data.directorName || 'Administrateur Principal',
-        gender: 'M',
-        role: (data.adminRole as any) || 'proviseur',
-        roleTitle: 'Administrateur Général Établissement',
-        department: 'Direction Générale',
-        phone: data.workPhone,
-        email: data.workEmail,
-        accessStatus: 'Actif',
-        lastLogin: 'À l\'instant',
-        permissions: [
-          'saisie_notes',
-          'validation_bulletins',
-          'appel_presences',
-          'encaissement_ecolage',
-          'gestion_inscriptions',
-          'administration_comptes',
-          'rapports_meppsa',
-          'communication_sms',
-        ],
-        joinDate: new Date().toLocaleDateString('fr-FR'),
-      },
-    ],
+    staff: [],
     classes: [],
     cycles: [],
   });
@@ -241,7 +252,7 @@ export interface VerificationResult {
 }
 
 /**
- * Strictly verifies credentials against actually registered accounts.
+ * Strictly verifies credentials against registered accounts and Super Admin.
  */
 export function verifySchoolLogin(
   identifier: string,
@@ -300,14 +311,14 @@ export function verifySchoolLogin(
     };
   }
 
-  // Verify password strictly against registered school credentials
+  // Verify password strictly against credentials
   const expectedPassword = matchedAccount.password;
   
   if (!expectedPassword || expectedPassword !== trimmedPass) {
     return {
       success: false,
       error: 'INVALID_PASSWORD',
-      errorMessage: 'Mot de passe incorrect pour cet établissement.',
+      errorMessage: 'Mot de passe incorrect pour ce compte administrateur.',
       account: matchedAccount,
     };
   }
@@ -327,3 +338,4 @@ export function verifySchoolLogin(
     account: matchedAccount,
   };
 }
+

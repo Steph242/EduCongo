@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StaffAccount, AccessStatus, StaffRole } from '../../types';
-import { INITIAL_STAFF_ACCOUNTS, PERMISSION_DEFINITIONS } from '../../data/mockStaff';
+import { PERMISSION_DEFINITIONS } from '../../data/mockStaff';
+import { getSchoolData, saveSchoolData } from '../../services/accountService';
 import { StaffModal } from './StaffModal';
 import { RevokeAccessModal } from './RevokeAccessModal';
 import { StaffAccessCardModal } from './StaffAccessCardModal';
@@ -20,7 +21,20 @@ export const StaffAccountManager: React.FC<StaffAccountManagerProps> = ({
   cityName,
   showToast,
 }) => {
-  const [staffList, setStaffList] = useState<StaffAccount[]>(INITIAL_STAFF_ACCOUNTS);
+  const [staffList, setStaffList] = useState<StaffAccount[]>(() => {
+    const data = getSchoolData(schoolCode);
+    return data.staff || [];
+  });
+
+  useEffect(() => {
+    const data = getSchoolData(schoolCode);
+    setStaffList(data.staff || []);
+  }, [schoolCode]);
+
+  const updateStaffList = (newList: StaffAccount[]) => {
+    setStaffList(newList);
+    saveSchoolData(schoolCode, { staff: newList });
+  };
   const [subTab, setSubTab] = useState<StaffViewSubTab>('accounts');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -86,16 +100,16 @@ export const StaffAccountManager: React.FC<StaffAccountManagerProps> = ({
   const handleSaveStaff = (savedStaff: StaffAccount) => {
     const exists = staffList.some((s) => s.id === savedStaff.id);
     if (exists) {
-      setStaffList(staffList.map((s) => (s.id === savedStaff.id ? savedStaff : s)));
+      updateStaffList(staffList.map((s) => (s.id === savedStaff.id ? savedStaff : s)));
       showToast(`Compte de ${savedStaff.fullName} mis à jour avec succès !`);
     } else {
-      setStaffList([savedStaff, ...staffList]);
+      updateStaffList([savedStaff, ...staffList]);
       showToast(`Nouveau compte créé pour ${savedStaff.fullName} (SMS envoyé au ${savedStaff.phone}) !`);
     }
   };
 
   const handleUpdateStatus = (staffId: string, newStatus: AccessStatus, reason?: string) => {
-    setStaffList(
+    updateStaffList(
       staffList.map((s) =>
         s.id === staffId
           ? {
@@ -114,7 +128,7 @@ export const StaffAccountManager: React.FC<StaffAccountManagerProps> = ({
 
   const handleResetPassword = (staff: StaffAccount) => {
     const newPass = `Edu#${Math.floor(100000 + Math.random() * 900000)}`;
-    setStaffList(
+    updateStaffList(
       staffList.map((s) =>
         s.id === staff.id ? { ...s, temporaryPassword: newPass } : s
       )

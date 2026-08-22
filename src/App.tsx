@@ -732,7 +732,6 @@ export function App() {
                       onLoginSuccess={handleLoginSuccess}
                       onLoginWithSupabase={handleLoginWithSupabase}
                       onForgotPassword={() => setIsForgotModalOpen(true)}
-                      onOpenDevPanel={handleOpenDevPanel}
                     />
                   )}
 

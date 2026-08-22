@@ -277,7 +277,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
 
   const totalTuitionExpected = students.reduce((acc, s) => acc + s.tuitionTotal, 0);
   const totalTuitionCollected = students.reduce((acc, s) => acc + s.tuitionPaid, 0);
-  const collectionRate = Math.round((totalTuitionCollected / (totalTuitionExpected || 1)) * 100);
+  const collectionRate = totalTuitionExpected > 0 ? Math.round((totalTuitionCollected / totalTuitionExpected) * 100) : 0;
+  const generalAverageGrade = students.length > 0
+    ? (students.reduce((acc, s) => acc + (s.averageGrade || 0), 0) / students.length).toFixed(1)
+    : '0.0';
+  const estimatedSuccessRate = students.length > 0
+    ? Math.round((students.filter((s) => (s.averageGrade || 0) >= 10).length / students.length) * 100)
+    : 0;
 
   // Compute bulletin stats
   const totalCoef = bulletinGrades.reduce((acc, g) => acc + g.coefficient, 0);
@@ -1271,15 +1277,15 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                     <span className="material-symbols-outlined text-[20px]">star</span>
                   </div>
                 </div>
-                <div className="text-3xl font-extrabold text-white">15.8 / 20</div>
+                <div className="text-3xl font-extrabold text-white">{generalAverageGrade} / 20</div>
                 <div className="mt-2 text-xs text-teal-400 font-medium">
-                  Taux de réussite estimé : 94%
+                  Taux de réussite estimé : {estimatedSuccessRate}%
                 </div>
               </div>
             </div>
 
             {/* Attendance Chart Data Visualization (Recharts) */}
-            <AttendanceChart schoolName={schoolName} cityName={city} />
+            <AttendanceChart schoolName={schoolName} cityName={city} schoolCode={schoolCode} studentsCount={students.length} />
 
             {/* Middle Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1456,7 +1462,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               </div>
             </div>
 
-            <AttendanceChart schoolName={schoolName} cityName={city} />
+            <AttendanceChart schoolName={schoolName} cityName={city} schoolCode={schoolCode} studentsCount={students.length} />
           </div>
         )}
 
