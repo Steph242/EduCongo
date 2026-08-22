@@ -19,6 +19,13 @@ import {
   getSchoolSubscription,
 } from '../../services/accountService';
 import {
+  SUPABASE_CONFIG,
+  SUPABASE_SQL_SCHEMA,
+  testSupabaseConnection,
+  syncLocalSchoolsToSupabase,
+  supabase,
+} from '../../services/supabase';
+import {
   getDeveloperAccounts,
   createDeveloperAccount,
   deleteDeveloperAccount,
@@ -90,6 +97,69 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
     slogan: 'Discipline - Travail - Succès',
     subdomain: '',
   });
+
+  // Supabase live database connection state
+  const [supabaseTestStatus, setSupabaseTestStatus] = useState<{
+    tested: boolean;
+    loading: boolean;
+    connected?: boolean;
+    message?: string;
+    latencyMs?: number;
+  }>({ tested: false, loading: false });
+
+  const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<{
+    syncing: boolean;
+    message?: string;
+    success?: boolean;
+  }>({ syncing: false });
+
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+  const handleTestSupabase = async () => {
+    setSupabaseTestStatus({ tested: true, loading: true });
+    try {
+      const res = await testSupabaseConnection();
+      setSupabaseTestStatus({
+        tested: true,
+        loading: false,
+        connected: res.connected,
+        message: res.message,
+        latencyMs: res.latencyMs,
+      });
+    } catch (err: any) {
+      setSupabaseTestStatus({
+        tested: true,
+        loading: false,
+        connected: false,
+        message: err?.message || 'Erreur de connexion.',
+      });
+    }
+  };
+
+  const handleSyncToSupabase = async () => {
+    setSupabaseSyncStatus({ syncing: true });
+    try {
+      const res = await syncLocalSchoolsToSupabase();
+      setSupabaseSyncStatus({
+        syncing: false,
+        success: res.success,
+        message: res.message,
+      });
+      setTimeout(() => setSupabaseSyncStatus({ syncing: false }), 6000);
+    } catch (err: any) {
+      setSupabaseSyncStatus({
+        syncing: false,
+        success: false,
+        message: err?.message || 'Erreur lors de la synchronisation.',
+      });
+    }
+  };
+
+  const handleCopyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopyFeedback(`${label} copié dans le presse-papier !`);
+    setTimeout(() => setCopyFeedback(null), 3000);
+  };
 
   // SQL Query console simulator state
   const [sqlQuery, setSqlQuery] = useState("SELECT id, schoolName, city, status FROM schools WHERE department = 'Brazzaville';");
@@ -519,7 +589,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
             { id: 'dev_accounts', label: 'Comptes Développeurs & Super-Admins', icon: 'admin_panel_settings', count: devAccounts.length },
             { id: 'audit', label: 'Journal d’Audit & Sécurité', icon: 'security', count: auditLogs.length },
             { id: 'microservices', label: 'Microservices & Passerelles', icon: 'hub', count: microservices.length },
-            { id: 'console', label: 'Console SQL & Feature Flags', icon: 'code' },
+            { id: 'console', label: 'Base Supabase PostgreSQL & Console SQL', icon: 'database' },
             { id: 'broadcast', label: 'Alertes Ministérielles MEPPSA', icon: 'campaign' },
             { id: 'sandbox', label: 'Sandbox & Restauration', icon: 'database' },
           ].map((tab) => (
@@ -1214,84 +1284,264 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
           </div>
         )}
 
-        {/* ==================== TAB 4: SQL CONSOLE & FEATURE FLAGS ==================== */}
+        {/* ==================== TAB 4: SUPABASE POSTGRESQL & SQL CONSOLE ==================== */}
         {activeTab === 'console' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Interactive Query Simulator */}
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-400">terminal</span>
-                  Exécuteur de Requêtes (SQL / NoSQL Simulator)
-                </h3>
-                <span className="text-[11px] font-mono text-slate-400">Base: educongo_cluster</span>
+          <div className="space-y-6">
+            {/* Feedback notification toast */}
+            {copyFeedback && (
+              <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                {copyFeedback}
               </div>
+            )}
 
-              <textarea
-                rows={4}
-                value={sqlQuery}
-                onChange={(e) => setSqlQuery(e.target.value)}
-                className="w-full p-3 rounded-xl bg-slate-950 font-mono text-xs text-emerald-400 border border-white/15 focus:border-indigo-400 outline-none"
-              />
-
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] text-slate-400">
-                  Tables dispo: <code className="text-indigo-300">schools</code>, <code className="text-indigo-300">audit_logs</code>, <code className="text-indigo-300">students</code>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleExecuteSql}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">play_arrow</span>
-                  Exécuter la requête
-                </button>
-              </div>
-
-              {sqlResult && (
-                <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-white/10 max-h-60 overflow-auto custom-scrollbar">
-                  <div className="text-[11px] font-bold text-slate-400 mb-2">
-                    Résultat ({sqlResult.length} enregistrements) :
+            {/* Supabase Live Cluster Card */}
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-950/80 to-indigo-950/40 border border-emerald-500/30 space-y-5 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-md">
+                    <span className="material-symbols-outlined text-[28px]">database</span>
                   </div>
-                  <pre className="font-mono text-[11px] text-slate-200">
-                    {JSON.stringify(sqlResult, null, 2)}
-                  </pre>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-extrabold text-white text-base sm:text-lg tracking-wide">
+                        Supabase PostgreSQL Cluster (Brazzaville Live)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold font-mono">
+                        REF: {SUPABASE_CONFIG.projectRef}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Base de données relationnelle sécurisée avec Row Level Security (RLS) & Auth intégrée
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleTestSupabase}
+                    disabled={supabaseTestStatus.loading}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[16px] ${supabaseTestStatus.loading ? 'animate-spin' : ''}`}>
+                      {supabaseTestStatus.loading ? 'sync' : 'network_check'}
+                    </span>
+                    {supabaseTestStatus.loading ? 'Test en cours...' : 'Tester Connexion Live'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSyncToSupabase}
+                    disabled={supabaseSyncStatus.syncing}
+                    className="px-4 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-white text-xs font-bold transition-all border border-indigo-400/30 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[16px] ${supabaseSyncStatus.syncing ? 'animate-spin' : ''}`}>
+                      cloud_upload
+                    </span>
+                    {supabaseSyncStatus.syncing ? 'Synchronisation...' : 'Synchroniser vers Supabase'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Connection Test Results */}
+              {supabaseTestStatus.tested && (
+                <div className={`p-3.5 rounded-2xl text-xs font-medium flex items-center justify-between gap-3 border ${
+                  supabaseTestStatus.connected
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px]">
+                      {supabaseTestStatus.connected ? 'check_circle' : 'info'}
+                    </span>
+                    <span>{supabaseTestStatus.message}</span>
+                  </div>
+                  {supabaseTestStatus.latencyMs !== undefined && (
+                    <span className="px-2 py-0.5 rounded-lg bg-black/40 font-mono text-[11px] font-bold text-white">
+                      Latence: {supabaseTestStatus.latencyMs} ms
+                    </span>
+                  )}
                 </div>
               )}
-            </div>
 
-            {/* Feature Flags */}
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-              <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                <span className="material-symbols-outlined text-purple-400">toggle_on</span>
-                Feature Flags & Drapeaux Expérimentaux
-              </h3>
-              <p className="text-xs text-slate-400">
-                Activation/désactivation en direct des modules système pour l’ensemble des écoles.
-              </p>
+              {/* Sync Status Banner */}
+              {supabaseSyncStatus.message && (
+                <div className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 border ${
+                  supabaseSyncStatus.success
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
+                    : 'bg-rose-500/15 border-rose-500/30 text-rose-200'
+                }`}>
+                  <span className="material-symbols-outlined text-[18px]">
+                    {supabaseSyncStatus.success ? 'task_alt' : 'error'}
+                  </span>
+                  <span>{supabaseSyncStatus.message}</span>
+                </div>
+              )}
 
-              <div className="space-y-3">
-                {featureFlags.map((flag) => (
-                  <div key={flag.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-white text-xs">{flag.name}</div>
-                      <div className="text-[11px] text-slate-400">{flag.description}</div>
-                    </div>
+              {/* Config Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Project URL</span>
                     <button
                       type="button"
-                      onClick={() => handleToggleFlag(flag.id)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 ${
-                        flag.enabled ? 'bg-indigo-600' : 'bg-slate-700'
-                      }`}
+                      onClick={() => handleCopyText(SUPABASE_CONFIG.projectUrl, 'URL Supabase')}
+                      className="text-[10px] text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
                     >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          flag.enabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
+                      <span className="material-symbols-outlined text-[12px]">content_copy</span> Copier
                     </button>
                   </div>
-                ))}
+                  <div className="font-mono text-emerald-300 font-bold break-all">
+                    {SUPABASE_CONFIG.projectUrl}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Publishable / Anon Key</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(SUPABASE_CONFIG.publishableKey, 'Publishable Key')}
+                      className="text-[10px] text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">content_copy</span> Copier
+                    </button>
+                  </div>
+                  <div className="font-mono text-indigo-300 font-bold truncate">
+                    {SUPABASE_CONFIG.publishableKey}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-1.5 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">Direct PostgreSQL Connection String (Port 5432)</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(SUPABASE_CONFIG.directConnectionString, 'Connection String')}
+                      className="text-[10px] text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">content_copy</span> Copier
+                    </button>
+                  </div>
+                  <div className="font-mono text-slate-200 text-[11px] break-all bg-slate-900/90 p-2 rounded-xl border border-white/10">
+                    {SUPABASE_CONFIG.directConnectionString}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions & SQL Schema Helpers */}
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 text-xs">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(SUPABASE_SQL_SCHEMA, 'Schéma SQL Supabase')}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">data_object</span>
+                    Copier le Schéma SQL Complet (Tables, RLS)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(SUPABASE_CONFIG.cliCommands.join('\n'), 'Commandes CLI Supabase')}
+                    className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 border border-white/15 font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">terminal</span>
+                    Copier Commandes CLI Setup
+                  </button>
+                </div>
+
+                <a
+                  href="https://supabase.com/dashboard/project/hvjavqbpmdfdqdvunbsj"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <span>Ouvrir Console Supabase Web</span>
+                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Interactive Query Simulator & Feature Flags */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Interactive Query Simulator */}
+              <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400">terminal</span>
+                    Exécuteur de Requêtes (SQL Simulator & REST)
+                  </h3>
+                  <span className="text-[11px] font-mono text-slate-400">Cluster: hvjavqbpmdfdqdvunbsj</span>
+                </div>
+
+                <textarea
+                  rows={4}
+                  value={sqlQuery}
+                  onChange={(e) => setSqlQuery(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-slate-950 font-mono text-xs text-emerald-400 border border-white/15 focus:border-indigo-400 outline-none"
+                />
+
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-400">
+                    Tables: <code className="text-indigo-300">schools</code>, <code className="text-indigo-300">students</code>, <code className="text-indigo-300">teachers</code>, <code className="text-indigo-300">payments</code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExecuteSql}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+                    Exécuter la requête
+                  </button>
+                </div>
+
+                {sqlResult && (
+                  <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-white/10 max-h-60 overflow-auto custom-scrollbar">
+                    <div className="text-[11px] font-bold text-slate-400 mb-2">
+                      Résultat ({sqlResult.length} enregistrements) :
+                    </div>
+                    <pre className="font-mono text-[11px] text-slate-200">
+                      {JSON.stringify(sqlResult, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Feature Flags */}
+              <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <span className="material-symbols-outlined text-purple-400">toggle_on</span>
+                  Feature Flags & Drapeaux Expérimentaux
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Activation/désactivation en direct des modules système pour l’ensemble des écoles.
+                </p>
+
+                <div className="space-y-3">
+                  {featureFlags.map((flag) => (
+                    <div key={flag.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-white text-xs">{flag.name}</div>
+                        <div className="text-[11px] text-slate-400">{flag.description}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFlag(flag.id)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer flex-shrink-0 ${
+                          flag.enabled ? 'bg-indigo-600' : 'bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            flag.enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

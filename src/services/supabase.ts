@@ -1,9 +1,175 @@
 import { supabase, isSupabaseLiveConfigured } from '../lib/supabase';
-import { SchoolRegistrationData, RegisteredSchoolAccount } from '../types';
-import { markAccountEmailVerified } from './accountService';
+import { SchoolRegistrationData, RegisteredSchoolAccount, Student, Teacher, PaymentRecord, SchoolSubscription } from '../types';
+import { markAccountEmailVerified, getRegisteredAccounts } from './accountService';
 
 export { supabase };
 export const isSupabaseConfigured = isSupabaseLiveConfigured;
+
+export const SUPABASE_CONFIG = {
+  projectUrl: 'https://hvjavqbpmdfdqdvunbsj.supabase.co',
+  publishableKey: 'sb_publishable_tGgcQloCGp6pd-QdqQgi7g_usuQW1yW',
+  projectRef: 'hvjavqbpmdfdqdvunbsj',
+  directConnectionString: 'postgresql://postgres:[YOUR-PASSWORD]@db.hvjavqbpmdfdqdvunbsj.supabase.co:5432/postgres',
+  cliCommands: [
+    'supabase login',
+    'supabase init',
+    'supabase link --project-ref hvjavqbpmdfdqdvunbsj',
+  ],
+};
+
+// Complete PostgreSQL schema generation for Supabase SQL Editor
+export const SUPABASE_SQL_SCHEMA = `-- ====================================================================
+-- EDUCONGO PROD - SCHÉMA DE BASE DE DONNÉES SUPABASE (POSTGRESQL)
+-- Project: Edu-Congo MEPPSA
+-- Project Ref: hvjavqbpmdfdqdvunbsj
+-- Generated: 2026-08-22
+-- ====================================================================
+
+-- 1. Table des Établissements Scolaires (Schools)
+CREATE TABLE IF NOT EXISTS public.schools (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    subdomain TEXT UNIQUE NOT NULL,
+    slogan TEXT DEFAULT 'Discipline - Travail - Succès',
+    school_type TEXT NOT NULL DEFAULT 'lycee',
+    city TEXT NOT NULL,
+    department TEXT NOT NULL,
+    district TEXT,
+    address TEXT,
+    work_email TEXT NOT NULL,
+    work_phone TEXT NOT NULL,
+    personal_phone TEXT,
+    director_name TEXT NOT NULL,
+    logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    status TEXT DEFAULT 'Actif',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Table des Utilisateurs & Personnels (Users & Staff)
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_code TEXT REFERENCES public.schools(code) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    role TEXT NOT NULL DEFAULT 'admin',
+    department TEXT,
+    access_status TEXT DEFAULT 'Actif',
+    is_super_admin BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Table des Élèves (Students)
+CREATE TABLE IF NOT EXISTS public.students (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_code TEXT NOT NULL,
+    matricule TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    gender VARCHAR(1) DEFAULT 'M',
+    birth_date DATE,
+    classroom TEXT NOT NULL,
+    parent_name TEXT,
+    parent_phone TEXT,
+    address TEXT,
+    email TEXT,
+    blood_group TEXT,
+    status TEXT DEFAULT 'Inscrit',
+    tuition_paid NUMERIC DEFAULT 0,
+    tuition_total NUMERIC DEFAULT 150000,
+    average_grade NUMERIC DEFAULT 10,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(school_code, matricule)
+);
+
+-- 4. Table des Enseignants (Teachers)
+CREATE TABLE IF NOT EXISTS public.teachers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_code TEXT NOT NULL,
+    matricule TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    status TEXT DEFAULT 'Actif',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(school_code, matricule)
+);
+
+-- 5. Table des Paiements de Scolarité & Mobile Money (Payments)
+CREATE TABLE IF NOT EXISTS public.payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference TEXT UNIQUE NOT NULL,
+    school_code TEXT NOT NULL,
+    student_matricule TEXT NOT NULL,
+    student_name TEXT NOT NULL,
+    amount NUMERIC NOT NULL,
+    payment_method TEXT NOT NULL,
+    month TEXT NOT NULL,
+    academic_year TEXT DEFAULT '2024 - 2025',
+    status TEXT DEFAULT 'Validé',
+    payment_date TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Table des Abonnements des Écoles (Subscriptions)
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    school_code TEXT UNIQUE NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'trial_pending',
+    status TEXT NOT NULL DEFAULT 'pending',
+    start_date TIMESTAMPTZ DEFAULT NOW(),
+    expiry_date TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '14 days'),
+    amount_fcfa NUMERIC DEFAULT 0,
+    transaction_ref TEXT,
+    is_paid BOOLEAN DEFAULT FALSE,
+    trial_days_remaining INT DEFAULT 14,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. Table des Journaux d'Audit & Sécurité (Audit Logs)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    level TEXT NOT NULL DEFAULT 'INFO',
+    action TEXT NOT NULL,
+    category TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    actor_name TEXT NOT NULL,
+    actor_role TEXT NOT NULL,
+    ip_address TEXT,
+    target_type TEXT,
+    target_id TEXT,
+    target_name TEXT,
+    details TEXT,
+    status TEXT DEFAULT 'SUCCESS',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Allow read access for authenticated users & anon demo
+CREATE POLICY "Public read schools" ON public.schools FOR SELECT USING (true);
+CREATE POLICY "Public insert schools" ON public.schools FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update schools" ON public.schools FOR UPDATE USING (true);
+
+CREATE POLICY "Public all students" ON public.students FOR ALL USING (true);
+CREATE POLICY "Public all teachers" ON public.teachers FOR ALL USING (true);
+CREATE POLICY "Public all payments" ON public.payments FOR ALL USING (true);
+CREATE POLICY "Public all subscriptions" ON public.subscriptions FOR ALL USING (true);
+CREATE POLICY "Public all audit_logs" ON public.audit_logs FOR ALL USING (true);
+`;
 
 // Local Email OTP Store (for fast verification resilience and offline support)
 const EMAIL_OTP_STORAGE_KEY = 'educongo_email_otp_codes_v2';
@@ -17,7 +183,6 @@ interface OtpRecord {
 
 /**
  * Returns the sanitized, clean origin URL for authentication redirection
- * Prevents {"error":"requested path is invalid"} by pointing directly to the root application origin.
  */
 export function getAppRedirectUrl(): string {
   if (typeof window !== 'undefined' && window.location) {
@@ -46,7 +211,6 @@ function saveStoredOtps(records: Record<string, OtpRecord>) {
 
 /**
  * Retrieves the currently active 6-digit verification code for a given email address.
- * Generates one on-the-fly if not already present.
  */
 export function getLatestVerificationCode(email: string): string {
   const cleanEmail = (email || '').trim().toLowerCase();
@@ -352,17 +516,115 @@ export async function registerSchoolWithSupabase(data: SchoolRegistrationData): 
 }
 
 /**
- * Check Supabase database connectivity
+ * Check Supabase database connectivity with latency
  */
-export async function testSupabaseConnection(): Promise<{ connected: boolean; message: string }> {
+export async function testSupabaseConnection(): Promise<{
+  connected: boolean;
+  message: string;
+  latencyMs?: number;
+  projectUrl: string;
+  projectRef: string;
+}> {
+  const startTime = Date.now();
+  const projectUrl = SUPABASE_CONFIG.projectUrl;
+  const projectRef = SUPABASE_CONFIG.projectRef;
+
   try {
-    const { error } = await supabase.from('schools').select('id').limit(1);
+    const { data, error } = await supabase.from('schools').select('id, code, name').limit(1);
+    const latency = Date.now() - startTime;
+
     if (!error) {
-      return { connected: true, message: 'Connecté à la base de données Supabase Edu-Congo.' };
+      return {
+        connected: true,
+        message: `Connecté avec succès à Supabase PostgreSQL (${latency}ms).`,
+        latencyMs: latency,
+        projectUrl,
+        projectRef,
+      };
     }
-    return { connected: false, message: error.message };
+
+    // Fallback ping to Supabase Auth endpoint
+    const { error: authError } = await supabase.auth.getSession();
+    const fallbackLatency = Date.now() - startTime;
+    if (!authError) {
+      return {
+        connected: true,
+        message: `Connecté à l'API Supabase Auth & REST (${fallbackLatency}ms). Note: Exécutez le script SQL pour initialiser les tables.`,
+        latencyMs: fallbackLatency,
+        projectUrl,
+        projectRef,
+      };
+    }
+
+    return {
+      connected: false,
+      message: error.message || authError?.message || 'Erreur de connexion',
+      latencyMs: fallbackLatency,
+      projectUrl,
+      projectRef,
+    };
   } catch (err: any) {
-    return { connected: false, message: err?.message || 'Erreur de connexion' };
+    const latency = Date.now() - startTime;
+    return {
+      connected: false,
+      message: err?.message || 'Impossible de joindre le serveur Supabase.',
+      latencyMs: latency,
+      projectUrl,
+      projectRef,
+    };
+  }
+}
+
+/**
+ * Sync all local schools to Supabase PostgreSQL database
+ */
+export async function syncLocalSchoolsToSupabase(): Promise<{
+  success: boolean;
+  count: number;
+  message: string;
+}> {
+  const schools = getRegisteredAccounts();
+  if (schools.length === 0) {
+    return { success: true, count: 0, message: 'Aucun établissement à synchroniser.' };
+  }
+
+  try {
+    const rows = schools.map((s) => ({
+      code: s.schoolCode.toUpperCase().trim(),
+      name: s.schoolName,
+      subdomain: s.subdomain || s.schoolCode.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      slogan: s.slogan || 'Discipline - Travail - Succès',
+      school_type: s.schoolType,
+      city: s.city,
+      department: s.department,
+      district: s.arrondissement || '',
+      address: `${s.arrondissement || ''}, ${s.city} (${s.department})`,
+      work_email: s.workEmail,
+      work_phone: s.workPhone,
+      personal_phone: s.personalPhone || null,
+      director_name: s.directorName,
+      logo_url: s.logoUrl || null,
+      is_active: s.status === 'Actif' || s.status === 'Validé',
+      status: s.status,
+    }));
+
+    const { error } = await supabase.from('schools').upsert(rows, { onConflict: 'code' });
+    if (error) {
+      throw error;
+    }
+
+    return {
+      success: true,
+      count: rows.length,
+      message: `${rows.length} établissement(s) synchronisé(s) dans Supabase.`,
+    };
+  } catch (err: any) {
+    console.error('Error syncing schools to Supabase:', err);
+    return {
+      success: false,
+      count: 0,
+      message: err?.message || 'Erreur lors de la synchronisation avec Supabase.',
+    };
   }
 }
 
