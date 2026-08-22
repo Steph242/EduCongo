@@ -13,6 +13,12 @@ import {
   INITIAL_FEATURE_FLAGS,
 } from '../../services/devControlService';
 import {
+  updateRegisteredAccount,
+  activateSchoolTrial,
+  updateSchoolSubscriptionPlan,
+  getSchoolSubscription,
+} from '../../services/accountService';
+import {
   getDeveloperAccounts,
   createDeveloperAccount,
   deleteDeveloperAccount,
@@ -621,9 +627,9 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                     <tr>
                       <th className="py-3.5 px-4">Établissement & Devise</th>
                       <th className="py-3.5 px-4">Code MEPPSA</th>
-                      <th className="py-3.5 px-4">Localisation</th>
-                      <th className="py-3.5 px-4">Direction / Contact</th>
-                      <th className="py-3.5 px-4">Sous-Domaine</th>
+                      <th className="py-3.5 px-4">Direction & Contact</th>
+                      <th className="py-3.5 px-4">Vérification E-mail</th>
+                      <th className="py-3.5 px-4">Abonnement & Essai</th>
                       <th className="py-3.5 px-4">Statut</th>
                       <th className="py-3.5 px-4 text-right">Actions Développeur</th>
                     </tr>
@@ -652,106 +658,176 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      filteredSchools.map((s) => (
-                      <tr key={s.id} className="hover:bg-white/[0.04] transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={s.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=100&q=80'}
-                              alt=""
-                              className="w-10 h-10 rounded-xl object-cover border border-white/15 flex-shrink-0"
-                            />
-                            <div>
-                              <div className="font-bold text-white text-sm">{s.schoolName}</div>
-                              {s.slogan && (
-                                <div className="text-[11px] text-yellow-300/90 italic font-serif">
-                                  « {s.slogan} »
+                      filteredSchools.map((s) => {
+                        const sub = getSchoolSubscription(s.schoolCode);
+                        return (
+                          <tr key={s.id} className="hover:bg-white/[0.04] transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={s.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=100&q=80'}
+                                  alt=""
+                                  className="w-10 h-10 rounded-xl object-cover border border-white/15 flex-shrink-0"
+                                />
+                                <div>
+                                  <div className="font-bold text-white text-sm">{s.schoolName}</div>
+                                  {s.slogan && (
+                                    <div className="text-[11px] text-yellow-300/90 italic font-serif">
+                                      « {s.slogan} »
+                                    </div>
+                                  )}
+                                  <div className="text-[10px] text-slate-400 capitalize">
+                                    {s.city} ({s.department}) • Type: {s.schoolType}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span className="font-mono font-bold text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-400/20">
+                                {s.schoolCode}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <div className="font-medium text-slate-200">{s.directorName || s.adminFullName}</div>
+                              <div className="text-[11px] text-emerald-400 font-mono">{s.workPhone}</div>
+                              <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{s.workEmail}</div>
+                            </td>
+
+                            {/* Email Verification Status & Quick Toggle */}
+                            <td className="py-3 px-4">
+                              {s.isEmailVerified ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold">
+                                  <span className="material-symbols-outlined text-[13px]">verified</span>
+                                  Vérifié
+                                </span>
+                              ) : (
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-semibold">
+                                    <span className="material-symbols-outlined text-[12px]">mail</span>
+                                    En attente
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateRegisteredAccount(s.schoolCode, { isEmailVerified: true });
+                                      refreshData();
+                                    }}
+                                    className="block text-[10px] font-bold text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                                  >
+                                    Valider manuellement
+                                  </button>
                                 </div>
                               )}
-                              <div className="text-[10px] text-slate-400 capitalize">
-                                Type: {s.schoolType} • Créé le {new Date(s.registeredAt).toLocaleDateString('fr-FR')}
+                            </td>
+
+                            {/* Subscription Status & Quick Actions */}
+                            <td className="py-3 px-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  {sub.plan === 'premium' && (
+                                    <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
+                                      PREMIUM (15k F)
+                                    </span>
+                                  )}
+                                  {sub.plan === 'standard' && (
+                                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                                      STANDARD (10k F)
+                                    </span>
+                                  )}
+                                  {sub.plan === 'trial_active' && (
+                                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold font-mono">
+                                      ESSAI: {sub.trialDaysRemaining ?? 14}J
+                                    </span>
+                                  )}
+                                  {sub.plan === 'trial_pending' && (
+                                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                                      Adhésion requise
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {sub.plan !== 'trial_active' && sub.plan !== 'standard' && sub.plan !== 'premium' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        activateSchoolTrial(s.schoolCode, 'Espèces / Virement', 'DEV-ACTIVATION-2500');
+                                        refreshData();
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/30 cursor-pointer"
+                                      title="Activer l'essai 14 jours (2500 FCFA)"
+                                    >
+                                      + Essai 14J
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateSchoolSubscriptionPlan(s.schoolCode, 'premium', 'Espèces / Virement', 'DEV-PREMIUM-15000');
+                                      refreshData();
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-[10px] font-bold border border-indigo-500/30 cursor-pointer"
+                                    title="Activer le plan Premium (15 000 FCFA)"
+                                  >
+                                    + Premium
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </td>
+                            </td>
 
-                        <td className="py-3 px-4">
-                          <span className="font-mono font-bold text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-400/20">
-                            {s.schoolCode}
-                          </span>
-                        </td>
+                            <td className="py-3 px-4">
+                              <select
+                                value={s.status}
+                                onChange={(e) => handleStatusChange(s.id, e.target.value as any)}
+                                className={`px-2.5 py-1 rounded-full border text-[11px] font-bold outline-none cursor-pointer ${getStatusBadge(s.status)}`}
+                              >
+                                <option value="Actif" className="bg-slate-900 text-emerald-400">Actif</option>
+                                <option value="Validé" className="bg-slate-900 text-blue-400">Validé</option>
+                                <option value="En attente" className="bg-slate-900 text-amber-400">En attente</option>
+                                <option value="Suspendu" className="bg-slate-900 text-rose-400">Suspendu</option>
+                              </select>
+                            </td>
 
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-slate-200">{s.city}</div>
-                          <div className="text-[11px] text-slate-400">{s.department}</div>
-                        </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Impersonate Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => onImpersonateSchool(s)}
+                                  title="Prendre le contrôle (Se connecter en tant que cette école)"
+                                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1 transition-all shadow-[0_0_10px_rgba(99,102,241,0.3)] cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">bolt</span>
+                                  Prendre Contrôle
+                                </button>
 
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-slate-200">{s.directorName}</div>
-                          <div className="text-[11px] text-emerald-400 font-mono">{s.workPhone}</div>
-                          <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{s.workEmail}</div>
-                        </td>
+                                {/* Inspect details */}
+                                <button
+                                  type="button"
+                                  onClick={() => setInspectingSchool(s)}
+                                  title="Inspecter le dossier"
+                                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                                </button>
 
-                        <td className="py-3 px-4">
-                          <button
-                            type="button"
-                            onClick={() => onOpenPortal(s)}
-                            className="font-mono text-emerald-400 hover:text-emerald-300 text-[11px] flex items-center gap-1 hover:underline cursor-pointer"
-                          >
-                            <span>{s.subdomain || 'etablissement'}.educongo.cg</span>
-                            <span className="material-symbols-outlined text-[13px]">open_in_new</span>
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <select
-                            value={s.status}
-                            onChange={(e) => handleStatusChange(s.id, e.target.value as any)}
-                            className={`px-2.5 py-1 rounded-full border text-[11px] font-bold outline-none cursor-pointer ${getStatusBadge(s.status)}`}
-                          >
-                            <option value="Actif" className="bg-slate-900 text-emerald-400">Actif</option>
-                            <option value="Validé" className="bg-slate-900 text-blue-400">Validé</option>
-                            <option value="En attente" className="bg-slate-900 text-amber-400">En attente</option>
-                            <option value="Suspendu" className="bg-slate-900 text-rose-400">Suspendu</option>
-                          </select>
-                        </td>
-
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Impersonate Button */}
-                            <button
-                              type="button"
-                              onClick={() => onImpersonateSchool(s)}
-                              title="Prendre le contrôle (Se connecter en tant que cette école)"
-                              className="px-2.5 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-[11px] flex items-center gap-1 transition-all shadow-[0_0_10px_rgba(99,102,241,0.3)] cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">bolt</span>
-                              Prendre Contrôle
-                            </button>
-
-                            {/* Inspect details */}
-                            <button
-                              type="button"
-                              onClick={() => setInspectingSchool(s)}
-                              title="Inspecter le dossier"
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">visibility</span>
-                            </button>
-
-                            {/* Delete */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSchool(s.id, s.schoolName)}
-                              title="Supprimer définitivement"
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">delete</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )))}
+                                {/* Delete */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSchool(s.id, s.schoolName)}
+                                  title="Supprimer définitivement"
+                                  className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>

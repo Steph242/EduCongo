@@ -4,6 +4,8 @@ import {
   Teacher,
   SubjectGrade,
   PaymentRecord,
+  RegisteredSchoolAccount,
+  SchoolSubscription,
 } from '../../types';
 import {
   INITIAL_STUDENTS,
@@ -17,7 +19,10 @@ import { StudentIdCardModal } from './StudentIdCardModal';
 import { TeacherWorkspace } from './TeacherWorkspace';
 import { StudentWorkspace } from './StudentWorkspace';
 import { SchoolSocialFeed } from '../Social/SchoolSocialFeed';
-import { getSchoolData, saveSchoolData } from '../../services/accountService';
+import { getSchoolData, saveSchoolData, getSchoolSubscription, getRegisteredAccounts } from '../../services/accountService';
+import { SchoolAdminConfigModal } from './SchoolAdminConfigModal';
+import { SchoolSubscriptionModal } from '../Subscription/SchoolSubscriptionModal';
+import { SubscriptionStatusBanner } from '../Subscription/SubscriptionStatusBanner';
 import {
   exportSingleStudentBulletinCSV,
   exportClassGradeSheetCSV,
@@ -50,12 +55,34 @@ const STUDENT_PHOTO_PRESETS = [
   { url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80', label: 'Étudiante 2' },
 ];
 
+const DEFAULT_FALLBACK_STUDENT: Student = {
+  id: 'STU-INIT',
+  matricule: 'CG-2024-0001',
+  firstName: 'Nouvel',
+  lastName: 'Apprenant',
+  gender: 'M',
+  studentType: 'eleve',
+  birthDate: '2008-01-01',
+  birthPlace: 'Brazzaville',
+  classroom: 'Terminale D',
+  parentName: 'Parent / Tuteur',
+  parentPhone: '+242 06 000 00 00',
+  photoUrl: STUDENT_PHOTO_PRESETS[0].url,
+  email: 'eleve@educongo.cg',
+  bloodGroup: 'O+',
+  address: 'Brazzaville',
+  status: 'Inscrit',
+  tuitionPaid: 0,
+  tuitionTotal: 150000,
+  averageGrade: 14.5,
+};
+
 export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
-  schoolName,
+  schoolName: initialSchoolName,
   schoolCode,
-  city,
-  slogan = 'Discipline - Travail - Succès',
-  logoUrl = 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
+  city: initialCity,
+  slogan: initialSlogan = 'Discipline - Travail - Succès',
+  logoUrl: initialLogoUrl = 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
   subdomain = 'lycee-brazza',
   onLogout,
   onOpenSubdomainView,
@@ -65,6 +92,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>(externalSelectedTab || 'overview');
   const [tabHistory, setTabHistory] = useState<TabType[]>([]);
   const [activeRole, setActiveRole] = useState<'admin' | 'enseignant' | 'comptable' | 'secretaire' | 'eleve'>('admin');
+  
+  // School profile dynamic state
+  const [schoolName, setSchoolName] = useState(initialSchoolName);
+  const [city, setCity] = useState(initialCity);
+  const [slogan, setSlogan] = useState(initialSlogan);
+  const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+
   const [students, setStudents] = useState<Student[]>(() => {
     const data = getSchoolData(schoolCode);
     return data.students || [];
@@ -78,12 +112,18 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     return data.payments || [];
   });
 
+  // Subscription state
+  const [subscription, setSubscription] = useState<SchoolSubscription>(() => getSchoolSubscription(schoolCode));
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [isAdminConfigModalOpen, setIsAdminConfigModalOpen] = useState(false);
+
   // Sync when schoolCode changes
   useEffect(() => {
     const data = getSchoolData(schoolCode);
     setStudents(data.students || []);
     setTeachers(data.teachers || []);
     setPayments(data.payments || []);
+    setSubscription(getSchoolSubscription(schoolCode));
   }, [schoolCode]);
 
   const persistSchoolData = (newStudents: Student[], newTeachers: Teacher[], newPayments: PaymentRecord[]) => {
@@ -132,10 +172,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     student: null,
   });
 
-  // Bulletin inspection state
-  const [selectedStudentForBulletin, setSelectedStudentForBulletin] = useState<Student>(
-    externalSelectedStudent || INITIAL_STUDENTS[0]
-  );
+  // Bulletin inspection state - Safe initialization with fallback
+  const [selectedStudentForBulletin, setSelectedStudentForBulletin] = useState<Student>(() => {
+    if (externalSelectedStudent) return externalSelectedStudent;
+    const data = getSchoolData(schoolCode);
+    if (data.students && data.students.length > 0) return data.students[0];
+    return DEFAULT_FALLBACK_STUDENT;
+  });
   const [bulletinGrades] = useState<SubjectGrade[]>(SAMPLE_BULLETIN_GRADES);
 
   // Left sidebar mobile state
@@ -177,9 +220,9 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     tuitionTotal: 0,
   });
 
-  // New payment form state
+  // New payment form state - Safe fallback
   const [newPayment, setNewPayment] = useState({
-    studentMatricule: INITIAL_STUDENTS[0].matricule,
+    studentMatricule: '',
     amount: 50000,
     paymentMethod: 'MTN Mobile Money' as PaymentRecord['paymentMethod'],
     month: 'Novembre 2024',
@@ -1083,6 +1126,22 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
+                  onClick={() => setIsAdminConfigModalOpen(true)}
+                  className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 border border-indigo-400/30 shadow-[0_0_15px_rgba(99,102,241,0.25)] cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">tune</span>
+                  <span>Configurer l'Établissement</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSubscriptionModalOpen(true)}
+                  className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+                  <span>Abonnement</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsAddStudentOpen(true)}
                   className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:from-emerald-500 hover:to-teal-500 transition-all flex items-center gap-1.5 border border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
                 >
@@ -1099,6 +1158,12 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Subscription Banner on School Dashboard */}
+            <SubscriptionStatusBanner
+              subscription={subscription}
+              onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
+            />
 
             {/* Profile / Role Selector Bar (RBAC System - Requirement 5) */}
             <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -3094,6 +3159,65 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* School Admin Configuration Modal */}
+      {isAdminConfigModalOpen && (
+        <SchoolAdminConfigModal
+          isOpen={isAdminConfigModalOpen}
+          onClose={() => {
+            setIsAdminConfigModalOpen(false);
+            const fresh = getSchoolData(schoolCode);
+            setStudents(fresh.students || []);
+            setTeachers(fresh.teachers || []);
+            setPayments(fresh.payments || []);
+            setSubscription(getSchoolSubscription(schoolCode));
+          }}
+          schoolAccount={
+            getRegisteredAccounts().find((a) => a.schoolCode === schoolCode) || {
+              id: 'SCH-DEFAULT',
+              schoolName: schoolName,
+              schoolCode: schoolCode,
+              city: city,
+              department: 'Brazzaville',
+              arrondissement: 'Centre',
+              slogan: slogan,
+              directorName: 'Directeur Général',
+              adminFullName: 'Administrateur',
+              workPhone: '+242 06 000 00 00',
+              workEmail: 'direction@educongo.cg',
+              schoolType: 'lycee',
+              passwordHash: '',
+              status: 'Actif',
+              isEmailVerified: true,
+              registeredAt: new Date().toISOString(),
+              documents: {},
+            }
+          }
+          onSchoolUpdated={(updated) => {
+            setSchoolName(updated.schoolName);
+            setCity(updated.city);
+            setSlogan(updated.slogan || '');
+            setLogoUrl(updated.logoUrl || logoUrl);
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* School Subscription Modal */}
+      {isSubscriptionModalOpen && (
+        <SchoolSubscriptionModal
+          isOpen={isSubscriptionModalOpen}
+          onClose={() => {
+            setIsSubscriptionModalOpen(false);
+            setSubscription(getSchoolSubscription(schoolCode));
+          }}
+          schoolName={schoolName}
+          schoolCode={schoolCode}
+          city={city}
+          onSubscriptionUpdated={(updated) => setSubscription(updated)}
+          showToast={showToast}
+        />
       )}
     </div>
   );

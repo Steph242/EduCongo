@@ -66,11 +66,52 @@ export interface RegisteredSchoolAccount {
   isPhoneVerified?: boolean;
   registeredAt: string;
   status: 'Actif' | 'En attente' | 'Validé';
+  subscription?: SchoolSubscription;
   documents: {
     agrementFile: string | null;
     statutsFile: string | null;
     identityFile: string | null;
   };
+}
+
+export type SubscriptionPlanType = 'trial_pending' | 'trial_active' | 'standard' | 'premium' | 'expired';
+
+export interface SchoolSubscription {
+  plan: SubscriptionPlanType;
+  planName: string;
+  status: 'active' | 'pending_payment' | 'expired' | 'trial';
+  membershipFeePaid: boolean;
+  membershipFeeAmount: number; // 2500 FCFA
+  trialStartDate?: string;
+  trialEndDate?: string;
+  trialDaysRemaining?: number;
+  monthlyFee: number; // 10000 (standard) or 15000 (premium)
+  lastPaymentDate?: string;
+  nextBillingDate?: string;
+  paymentMethod?: 'MTN Mobile Money' | 'Airtel Money' | 'Carte Bancaire' | 'Espèces / Virement';
+  transactionReference?: string;
+}
+
+export interface SchoolCycle {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  classesCount?: number;
+}
+
+export interface SchoolClassroom {
+  id: string;
+  name: string;
+  cycleId?: string;
+  cycleName?: string;
+  level: string;
+  section?: string;
+  capacity: number;
+  studentCount: number;
+  mainTeacherId?: string;
+  mainTeacherName?: string;
+  classroomNumber?: string;
 }
 
 export type PortalRole = 'staff' | 'student' | 'parent';

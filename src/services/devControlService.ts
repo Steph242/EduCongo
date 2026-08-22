@@ -1,8 +1,8 @@
 import { RegisteredSchoolAccount, MicroserviceHealth, DeveloperFeatureFlag, NationalEducationStats } from '../types';
-import { INITIAL_REGISTERED_SCHOOLS } from '../data/mockRegisteredSchools';
+import { getRegisteredAccounts } from './accountService';
 import { INITIAL_AUDIT_LOGS, AuditLogEntry } from '../data/mockAuditLogs';
 
-const STORAGE_SCHOOLS_KEY = 'educongo_registered_schools_prod';
+const STORAGE_SCHOOLS_KEY = 'educongo_registered_schools_prod_v3';
 const STORAGE_AUDIT_LOGS_KEY = 'educongo_system_audit_logs_v1';
 const STORAGE_FEATURE_FLAGS_KEY = 'educongo_dev_feature_flags_v1';
 
@@ -120,14 +120,12 @@ export const INITIAL_FEATURE_FLAGS: DeveloperFeatureFlag[] = [
 // Helper to get stored schools
 export function getRegisteredSchools(): RegisteredSchoolAccount[] {
   try {
-    const raw = localStorage.getItem(STORAGE_SCHOOLS_KEY);
-    if (raw) {
-      return JSON.parse(raw);
-    }
+    const registered = getRegisteredAccounts();
+    return registered;
   } catch (e) {
     console.error('Error loading schools:', e);
+    return [];
   }
-  return INITIAL_REGISTERED_SCHOOLS;
 }
 
 // Helper to save schools
