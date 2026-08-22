@@ -1,39 +1,8 @@
 import { SchoolRegistrationData, RegisteredSchoolAccount } from '../types';
 import { registerSchoolWithSupabase } from './supabase';
 
-const STORAGE_KEY = 'educongo_registered_schools_prod_v2';
-const SCHOOL_DATA_STORAGE_KEY_PREFIX = 'educongo_school_data_prod_v2_';
-
-/**
- * Super Administrator account configured for direct login and system administration
- */
-export const SUPER_ADMIN_ACCOUNT: RegisteredSchoolAccount = {
-  id: 'SUPER_ADMIN_STEPH',
-  schoolName: 'Super Administration EduCongo (MEPPSA)',
-  schoolCode: 'SUPER-ADMIN-CG',
-  schoolType: 'superadmin',
-  department: 'Brazzaville',
-  city: 'Brazzaville',
-  arrondissement: 'Plateau des 15 Ans',
-  directorName: 'Steph ALONGO',
-  adminFullName: 'Steph ALONGO',
-  adminRole: 'superadmin',
-  workEmail: 'steph.alongo@gmail.com',
-  personalEmail: 'steph.alongo@gmail.com',
-  workPhone: '+242 06 600 00 00',
-  personalPhone: '+242 06 600 00 00',
-  password: 'Verlaine92/Brealy95/',
-  registeredAt: '2024-01-01T00:00:00.000Z',
-  status: 'Actif',
-  isEmailVerified: true,
-  slogan: 'Direction Générale & Supervision Nationale des Établissements',
-  subdomain: 'superadmin',
-  documents: {
-    agrementFile: null,
-    statutsFile: null,
-    identityFile: null,
-  },
-};
+const STORAGE_KEY = 'educongo_registered_schools_prod_v3';
+const SCHOOL_DATA_STORAGE_KEY_PREFIX = 'educongo_school_data_prod_v3_';
 
 /**
  * Normalizes phone numbers for accurate Congolese telecom matching
@@ -53,7 +22,7 @@ export function normalizeCongoPhone(phone: string): string {
 
 /**
  * Retrieves all registered school accounts from persistent storage.
- * Always includes the super administrator account and newly registered schools.
+ * Only genuine registered schools are stored here.
  */
 export function getRegisteredAccounts(): RegisteredSchoolAccount[] {
   try {
@@ -61,17 +30,13 @@ export function getRegisteredAccounts(): RegisteredSchoolAccount[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Ensure super admin is included and no duplicates
-        const filtered = parsed.filter(
-          (acc) => acc.workEmail?.toLowerCase() !== 'steph.alongo@gmail.com'
-        );
-        return [SUPER_ADMIN_ACCOUNT, ...filtered];
+        return parsed;
       }
     }
   } catch (err) {
     console.error('Error loading registered accounts:', err);
   }
-  return [SUPER_ADMIN_ACCOUNT];
+  return [];
 }
 
 export interface SchoolCustomData {
@@ -86,7 +51,7 @@ export interface SchoolCustomData {
 
 /**
  * Get school specific operational data.
- * Requirement 3: Every newly registered school is 100% EMPTY by default.
+ * Every newly registered school is 100% EMPTY by default (virgin state).
  * All indicators at 0, no pre-filled classes, no pre-filled students or teachers.
  */
 export function getSchoolData(schoolCode: string): SchoolCustomData {
@@ -114,7 +79,7 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
     console.error('Error loading school data:', e);
   }
 
-  // 100% Empty state for new schools: Administrator must configure from A to Z
+  // 100% Empty state for new schools
   return {
     isNewlyCreated: true,
     students: [],
@@ -127,54 +92,100 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
 }
 
 /**
- * Save school operational data
+ * Save school specific operational data
  */
 export function saveSchoolData(schoolCode: string, data: Partial<SchoolCustomData>): void {
   const cleanCode = (schoolCode || '').toUpperCase().trim();
+  if (!cleanCode) return;
+
   const storageKey = `${SCHOOL_DATA_STORAGE_KEY_PREFIX}${cleanCode}`;
-  const existing = getSchoolData(cleanCode);
-  const updated = { ...existing, ...data };
+  const current = getSchoolData(schoolCode);
+  const merged = { ...current, ...data };
+
   try {
-    localStorage.setItem(storageKey, JSON.stringify(updated));
+    localStorage.setItem(storageKey, JSON.stringify(merged));
   } catch (e) {
     console.error('Error saving school data:', e);
   }
 }
 
 /**
- * Saves a new registered school account to persistent storage and connects with Supabase.
+ * Check if a school code is already taken
  */
-export function saveRegisteredAccount(data: SchoolRegistrationData): RegisteredSchoolAccount {
+export function isSchoolCodeTaken(schoolCode: string): boolean {
+  if (!schoolCode) return false;
+  const accounts = getRegisteredAccounts();
+  return accounts.some((acc) => acc.schoolCode.toUpperCase() === schoolCode.toUpperCase().trim());
+}
+
+/**
+ * Check if a work email is already taken
+ */
+export function isWorkEmailTaken(email: string): boolean {
+  if (!email) return false;
+  const accounts = getRegisteredAccounts();
+  const cleanEmail = email.toLowerCase().trim();
+  return accounts.some(
+    (acc) =>
+      (acc.workEmail && acc.workEmail.toLowerCase().trim() === cleanEmail) ||
+      (acc.personalEmail && acc.personalEmail.toLowerCase().trim() === cleanEmail)
+  );
+}
+
+/**
+ * Check if a phone number is already registered
+ */
+export function isPhoneTaken(phone: string): boolean {
+  const normInput = normalizeCongoPhone(phone);
+  if (!normInput) return false;
+  const accounts = getRegisteredAccounts();
+  return accounts.some(
+    (acc) =>
+      normalizeCongoPhone(acc.workPhone) === normInput ||
+      normalizeCongoPhone(acc.personalPhone) === normInput
+  );
+}
+
+/**
+ * Check if a subdomain is already taken
+ */
+export function isSubdomainTaken(subdomain: string): boolean {
+  if (!subdomain) return false;
+  const cleanSub = subdomain.toLowerCase().trim();
+  const accounts = getRegisteredAccounts();
+  return accounts.some((acc) => (acc.subdomain || '').toLowerCase().trim() === cleanSub);
+}
+
+/**
+ * Save a new registered school account with full Supabase integration
+ * and initialize a completely empty data record.
+ */
+export async function saveRegisteredAccount(data: SchoolRegistrationData): Promise<RegisteredSchoolAccount> {
   const accounts = getRegisteredAccounts();
 
-  // Check if an account with this schoolCode or email/phone already exists to update it
-  const cleanCode = (data.schoolCode || '').trim().toUpperCase();
-  const existingIndex = accounts.findIndex(
-    (acc) =>
-      (cleanCode && acc.schoolCode.toUpperCase() === cleanCode) ||
-      (data.workEmail && acc.workEmail.toLowerCase() === data.workEmail.trim().toLowerCase()) ||
-      (data.workPhone && normalizeCongoPhone(acc.workPhone) === normalizeCongoPhone(data.workPhone))
-  );
-
   const newAccount: RegisteredSchoolAccount = {
-    id: existingIndex >= 0 ? accounts[existingIndex].id : 'sch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    schoolName: data.schoolName.trim(),
-    schoolCode: data.schoolCode.trim().toUpperCase(),
+    id: `SCH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+    schoolName: data.schoolName,
+    schoolCode: data.schoolCode,
     schoolType: data.schoolType || 'secondaire',
     department: data.department || 'Brazzaville',
     city: data.city || 'Brazzaville',
-    arrondissement: data.arrondissement || '',
+    arrondissement: data.arrondissement || 'Centre',
     directorName: data.directorName || '',
     adminFullName: data.adminFullName || '',
-    adminRole: data.adminRole || 'proviseur',
-    workEmail: data.workEmail.trim().toLowerCase(),
-    personalEmail: (data.personalEmail || '').trim().toLowerCase(),
-    workPhone: data.workPhone.trim(),
-    personalPhone: (data.personalPhone || '').trim(),
-    password: data.password || 'EduCongo2024!',
+    adminRole: data.adminRole || 'Directeur / Proviseur',
+    workEmail: data.workEmail,
+    personalEmail: data.personalEmail || '',
+    workPhone: data.workPhone,
+    personalPhone: data.personalPhone || '',
+    password: data.password || '',
+    slogan: data.slogan || 'Discipline - Travail - Succès',
+    logoUrl: data.logoUrl || '',
+    subdomain: data.subdomain || data.schoolCode.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+    isEmailVerified: data.isEmailVerified ?? false,
+    isPhoneVerified: data.isPhoneVerified ?? false,
     registeredAt: new Date().toISOString(),
     status: 'Actif',
-    isEmailVerified: Boolean(data.isEmailVerified),
     documents: {
       agrementFile: data.documents?.agrementFile || null,
       statutsFile: data.documents?.statutsFile || null,
@@ -182,20 +193,16 @@ export function saveRegisteredAccount(data: SchoolRegistrationData): RegisteredS
     },
   };
 
-  if (existingIndex >= 0) {
-    accounts[existingIndex] = newAccount;
-  } else {
-    accounts.push(newAccount);
-  }
+  accounts.push(newAccount);
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
   } catch (err) {
-    console.error('Error saving account to localStorage:', err);
+    console.error('Error saving registered account to localStorage:', err);
   }
 
-  // Initialize strictly EMPTY data state for this newly registered school
-  saveSchoolData(cleanCode, {
+  // Initialize a completely empty record for this school
+  saveSchoolData(data.schoolCode, {
     isNewlyCreated: true,
     students: [],
     teachers: [],
@@ -221,7 +228,7 @@ export function markAccountEmailVerified(emailOrCode: string): boolean {
   const accounts = getRegisteredAccounts();
   const search = emailOrCode.trim().toLowerCase();
   let found = false;
-  
+
   const updated = accounts.map((acc) => {
     if (
       acc.workEmail.toLowerCase() === search ||
@@ -252,7 +259,7 @@ export interface VerificationResult {
 }
 
 /**
- * Strictly verifies credentials against registered accounts and Super Admin.
+ * Strictly verifies credentials against registered accounts.
  */
 export function verifySchoolLogin(
   identifier: string,
@@ -271,7 +278,6 @@ export function verifySchoolLogin(
   }
 
   const accounts = getRegisteredAccounts();
-
   let matchedAccount: RegisteredSchoolAccount | undefined;
 
   if (mode === 'phone') {
@@ -313,7 +319,7 @@ export function verifySchoolLogin(
 
   // Verify password strictly against credentials
   const expectedPassword = matchedAccount.password;
-  
+
   if (!expectedPassword || expectedPassword !== trimmedPass) {
     return {
       success: false,
@@ -338,4 +344,3 @@ export function verifySchoolLogin(
     account: matchedAccount,
   };
 }
-

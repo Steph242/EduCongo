@@ -20,6 +20,7 @@ import {
   DeveloperAccount,
 } from '../../services/devAccountService';
 import { CONGO_DEPARTMENTS, CONGO_CITIES } from '../../data/mockData';
+import { ThemeToggle } from '../Common/ThemeToggle';
 
 interface DevControlPanelProps {
   onBackToApp: () => void;
@@ -418,6 +419,8 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             CLUSTER BZV: CONNECTÉ (18ms)
           </div>
+
+          <ThemeToggle />
 
           <button
             type="button"

@@ -3,6 +3,7 @@ import { AppScreen, SystemNotification, NotificationCategory, Student, StaffAcco
 import { ConnectivityIndicator } from './Header/ConnectivityIndicator';
 import { NotificationCenter } from './Header/NotificationCenter';
 import { GlobalSearchBar } from './Header/GlobalSearchBar';
+import { ThemeToggle } from './Common/ThemeToggle';
 
 interface HeaderProps {
   currentScreen: AppScreen;
@@ -15,6 +16,7 @@ interface HeaderProps {
   onOpenAbout: () => void;
   onOpenHelp: () => void;
   onOpenDevPanel?: () => void;
+  isDevAuthenticated?: boolean;
   // Global Search Handlers
   onSelectStudent: (student: Student) => void;
   onSelectStaff: (staff: StaffAccount) => void;
@@ -46,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAbout,
   onOpenHelp,
   onOpenDevPanel,
+  isDevAuthenticated = false,
   onSelectStudent,
   onSelectStaff,
   onSelectDocument,
@@ -64,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSound,
 }) => {
   return (
-    <header className="bg-slate-950/50 backdrop-blur-xl border-b border-white/10 w-full sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,0,0,0.3)]">
+    <header className="bg-slate-950/60 dark:bg-slate-950/70 light:bg-white/80 backdrop-blur-xl border-b border-white/10 dark:border-white/10 light:border-slate-200 w-full sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,0,0,0.2)] transition-colors duration-300">
       <div className="flex justify-between items-center px-3 sm:px-6 md:px-8 w-full max-w-[1280px] mx-auto h-20 gap-2 sm:gap-4">
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Universal Back Button if canGoBack is true */}
@@ -87,16 +90,16 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigate(isLoggedIn ? 'dashboard' : 'auth')}
             className="flex items-center gap-2.5 sm:gap-3 text-left group transition-transform active:scale-95 cursor-pointer shrink-0"
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-600 to-indigo-600 p-[1px] shadow-[0_0_20px_rgba(16,185,129,0.35)]">
-              <div className="w-full h-full bg-slate-950/80 backdrop-blur-md rounded-[11px] flex items-center justify-center font-bold text-base sm:text-lg text-emerald-400">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-teal-500 p-[1px] shadow-[0_0_20px_rgba(37,99,235,0.35)]">
+              <div className="w-full h-full bg-slate-950/85 backdrop-blur-md rounded-[11px] flex items-center justify-center font-extrabold text-base sm:text-lg text-blue-400">
                 EC
               </div>
             </div>
             <div className="hidden sm:block">
-              <div className="text-[18px] sm:text-[22px] font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-300 bg-clip-text text-transparent leading-none">
+              <div className="text-[18px] sm:text-[22px] font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-blue-300 dark:from-white dark:via-slate-100 dark:to-blue-300 light:from-slate-900 light:via-blue-900 light:to-indigo-800 bg-clip-text text-transparent leading-none">
                 EduCongo
               </div>
-              <span className="text-[9.5px] sm:text-[10.5px] font-medium text-slate-400 tracking-wider uppercase block">
+              <span className="text-[9.5px] sm:text-[10.5px] font-semibold text-slate-400 tracking-wider uppercase block">
                 République du Congo
               </span>
             </div>
@@ -112,16 +115,20 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </div>
 
-        {/* Desktop Session / Help Links / Dev Control Panel */}
+        {/* Navigation / Links / Theme Switcher */}
         <nav className="flex items-center gap-1.5 sm:gap-2.5">
-          {onOpenDevPanel && (
+          {/* Universal Theme Toggle (Accessible Everywhere) */}
+          <ThemeToggle />
+
+          {/* Dev Panel button only shown if the user is ALREADY authenticated as Developer */}
+          {isDevAuthenticated && onOpenDevPanel && (
             <button
               onClick={onOpenDevPanel}
-              title="Console Développeur & Super-Admin"
+              title="Console Développeur"
               className={`text-[11px] sm:text-[12px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                 currentScreen === 'dev_panel'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400/40 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
-                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 hover:text-white border-indigo-500/40 shadow-[0_0_10px_rgba(99,102,241,0.2)]'
+                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-indigo-400/40 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
+                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 hover:text-white border-indigo-500/40'
               }`}
             >
               <span className="material-symbols-outlined text-[16px] text-indigo-300">terminal</span>
@@ -133,19 +140,19 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenHelp}
             className="hidden md:flex text-[12.5px] font-medium text-slate-300 hover:text-white px-2 py-1.5 rounded-lg hover:bg-white/[0.06] transition-all items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px] text-indigo-400">help</span>
+            <span className="material-symbols-outlined text-[16px] text-blue-400">help</span>
             Guide
           </button>
           <button
             onClick={onOpenAbout}
             className="hidden md:flex text-[12.5px] font-medium text-slate-300 hover:text-white px-2 py-1.5 rounded-lg hover:bg-white/[0.06] transition-all items-center gap-1 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px] text-emerald-400">info</span>
+            <span className="material-symbols-outlined text-[16px] text-teal-400">info</span>
             À propos
           </button>
           <div className="hidden lg:block h-4 w-[1px] bg-white/15"></div>
-          <div className="hidden lg:flex items-center gap-1.5 bg-emerald-500/10 text-emerald-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/25 backdrop-blur-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="hidden lg:flex items-center gap-1.5 bg-blue-500/10 text-blue-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/25 backdrop-blur-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
             2024-2025
           </div>
         </nav>
@@ -178,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => onNavigate('dashboard')}
                 className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   currentScreen === 'dashboard'
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] border border-emerald-400/30'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-400/30'
                     : 'bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-slate-200 backdrop-blur-md'
                 }`}
               >
@@ -197,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onNavigate('auth')}
-                className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 backdrop-blur-md transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 backdrop-blur-md transition-all shadow-[0_0_15px_rgba(59,130,246,0.15)] cursor-pointer"
               >
                 <span className="hidden sm:inline">Portail </span>Établissement
               </button>
@@ -208,4 +215,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthViewMode, AppScreen, SchoolRegistrationData, SystemNotification, Student, StaffAccount, AdminDocument } from './types';
 import { supabase } from './lib/supabase';
 import { getRegisteredAccounts, saveRegisteredAccount, verifySchoolLogin, markAccountEmailVerified } from './services/accountService';
+import { verifyDeveloperCredentials } from './services/devAccountService';
 import { isEmailAlreadyVerified, sendEmailVerificationCode } from './services/supabase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -122,6 +123,13 @@ export function App() {
         );
 
         const metadata = session.user.user_metadata || {};
+        if (session.user.email?.toLowerCase() === 'steph.alongo@gmail.com' || metadata.role === 'super_admin') {
+          setIsDevAuthenticated(true);
+          setIsLoggedIn(true);
+          setCurrentScreen('dev_panel');
+          return;
+        }
+
         const schoolInfo = {
           name: metadata.school_name || metadata.schoolName || session.user.email?.split('@')[0] || 'Établissement Scolaire',
           city: metadata.city || 'Brazzaville',
@@ -355,6 +363,17 @@ export function App() {
               ? `${cleanInput || 'school'}@educongo.cg`
               : `${identifier.toLowerCase().replace(/[^a-z0-9]/g, '')}@educongo.cg`;
         }
+      }
+
+      // Check if user is a Developer / Super-Administrator (steph.alongo@gmail.com, etc.)
+      const devCheck = verifyDeveloperCredentials(emailToUse, password);
+      if (devCheck.success && devCheck.account) {
+        setIsDevAuthenticated(true);
+        setCurrentScreen('dev_panel');
+        setIsLoggedIn(true);
+        // Sync developer session in Supabase Auth if online
+        supabase.auth.signInWithPassword({ email: emailToUse, password }).catch(() => {});
+        return { success: true };
       }
 
       // Real Supabase API call: signInWithPassword
