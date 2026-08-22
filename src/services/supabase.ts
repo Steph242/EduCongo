@@ -227,7 +227,7 @@ export function isEmailAlreadyVerified(email: string): boolean {
 }
 
 /**
- * Register a new school in Supabase Auth & Firestore/Postgres
+ * Register a new school in Supabase Auth & PostgreSQL database (schools, users)
  */
 export async function registerSchoolWithSupabase(data: SchoolRegistrationData): Promise<{
   success: boolean;
@@ -237,7 +237,7 @@ export async function registerSchoolWithSupabase(data: SchoolRegistrationData): 
   const email = data.workEmail.trim().toLowerCase();
   const password = data.password || 'EduCongo2024!';
 
-  // Attempt Supabase sign up if configured
+  // Attempt Supabase sign up and table inserts
   if (isSupabaseConfigured) {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -260,6 +260,46 @@ export async function registerSchoolWithSupabase(data: SchoolRegistrationData): 
       if (authError && !authError.message.includes('User already registered')) {
         console.warn('Supabase Auth error:', authError.message);
       }
+
+      // Insert or upsert into `public.schools` table
+      try {
+        await supabase.from('schools').upsert(
+          {
+            code: data.schoolCode.toUpperCase().trim(),
+            name: data.schoolName,
+            subdomain: data.subdomain || data.schoolCode.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+            slogan: data.slogan || 'Discipline - Travail - Succès',
+            school_type: data.schoolType,
+            city: data.city,
+            department: data.department,
+            district: data.arrondissement || '',
+            address: `${data.arrondissement || ''}, ${data.city} (${data.department})`,
+            work_email: email,
+            work_phone: data.workPhone,
+            personal_phone: data.personalPhone,
+            director_name: data.directorName,
+            logo_url: data.logoUrl || null,
+            is_active: true,
+          },
+          { onConflict: 'code' }
+        );
+
+        // Insert into `public.users` table
+        await supabase.from('users').upsert(
+          {
+            full_name: data.adminFullName || data.directorName,
+            email: email,
+            phone: data.workPhone || data.personalPhone,
+            role: data.adminRole || 'admin',
+            department: 'Direction & Administration',
+            access_status: 'Actif',
+            is_super_admin: false,
+          },
+          { onConflict: 'email' }
+        );
+      } catch (dbErr) {
+        console.warn('Supabase database sync note:', dbErr);
+      }
     } catch (err) {
       console.warn('Supabase connection warning:', err);
     }
@@ -269,6 +309,21 @@ export async function registerSchoolWithSupabase(data: SchoolRegistrationData): 
     success: true,
     schoolId: 'sch_' + Date.now(),
   };
+}
+
+/**
+ * Check Supabase database connectivity
+ */
+export async function testSupabaseConnection(): Promise<{ connected: boolean; message: string }> {
+  try {
+    const { error } = await supabase.from('schools').select('id').limit(1);
+    if (!error) {
+      return { connected: true, message: 'Connecté à la base de données Supabase Edu-Congo.' };
+    }
+    return { connected: false, message: error.message };
+  } catch (err: any) {
+    return { connected: false, message: err?.message || 'Erreur de connexion' };
+  }
 }
 
 /**
