@@ -3,7 +3,7 @@ import { AuthViewMode, AppScreen, SchoolRegistrationData, SystemNotification, St
 import { supabase } from './lib/supabase';
 import { getRegisteredAccounts, saveRegisteredAccount, verifySchoolLogin, markAccountEmailVerified } from './services/accountService';
 import { verifyDeveloperCredentials } from './services/devAccountService';
-import { isEmailAlreadyVerified, sendEmailVerificationCode } from './services/supabase';
+import { isEmailAlreadyVerified, sendEmailVerificationCode, getAppRedirectUrl } from './services/supabase';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LeftHeroPanel } from './components/Auth/LeftHeroPanel';
@@ -107,8 +107,50 @@ export function App() {
     } catch {}
   }, []);
 
-  // Supabase Auth Session Listener & Auto-login
+  // Supabase Auth Session Listener & Auto-login with URL email confirmation parser
   useEffect(() => {
+    // 1. Check URL parameters and hash for email confirmation callbacks
+    const handleUrlAuthParams = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        
+        const code = urlParams.get('code');
+        const tokenHash = urlParams.get('token_hash');
+        const type = (urlParams.get('type') || hashParams.get('type') || 'signup') as any;
+        const hasAccessToken = hashParams.has('access_token');
+        const errorDesc = urlParams.get('error_description') || hashParams.get('error_description');
+
+        if (code) {
+          try {
+            await (supabase.auth as any).exchangeCodeForSession(window.location.href);
+          } catch (exchangeErr) {
+            console.warn('Exchange code notice:', exchangeErr);
+          }
+        } else if (tokenHash) {
+          try {
+            await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: type || 'signup',
+            });
+          } catch (otpErr) {
+            console.warn('Verify token_hash notice:', otpErr);
+          }
+        }
+
+        // Clean up URL if auth parameters were present
+        if (code || tokenHash || hasAccessToken || errorDesc) {
+          try {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch {}
+        }
+      } catch (paramErr) {
+        console.warn('URL param parse notice:', paramErr);
+      }
+    };
+
+    handleUrlAuthParams();
+
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.warn('Supabase getSession notice:', error.message);
@@ -141,6 +183,8 @@ export function App() {
         setCurrentSchool(schoolInfo);
 
         if (isConfirmed) {
+          if (session.user.email) markAccountEmailVerified(session.user.email);
+          if (schoolInfo.code) markAccountEmailVerified(schoolInfo.code);
           setIsLoggedIn(true);
           setCurrentScreen('dashboard');
         } else {
@@ -171,16 +215,19 @@ export function App() {
         );
 
         const metadata = session.user.user_metadata || {};
-        setCurrentSchool({
+        const schoolInfo = {
           name: metadata.school_name || metadata.schoolName || session.user.email?.split('@')[0] || 'Établissement Scolaire',
           city: metadata.city || 'Brazzaville',
           code: metadata.school_code || metadata.schoolCode || 'CG-2024',
           slogan: metadata.slogan || 'Discipline - Travail - Succès',
           logoUrl: metadata.logo_url || metadata.logoUrl || '',
           subdomain: metadata.subdomain || 'mon-ecole',
-        });
+        };
+        setCurrentSchool(schoolInfo);
 
         if (isConfirmed) {
+          if (session.user.email) markAccountEmailVerified(session.user.email);
+          if (schoolInfo.code) markAccountEmailVerified(schoolInfo.code);
           setIsLoggedIn(true);
         } else {
           setIsLoggedIn(false);
@@ -505,11 +552,13 @@ export function App() {
         .toLowerCase();
       const passwordToUse = formData.password || 'EduCongo2024!';
 
-      // Real Supabase API call: signUp
+      // Real Supabase API call: signUp with explicit redirect URL to prevent invalid path error
+      const redirectUrl = getAppRedirectUrl();
       const { data, error } = await supabase.auth.signUp({
         email: emailToUse,
         password: passwordToUse,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             school_name: formData.schoolName,
             school_code: formData.schoolCode,
