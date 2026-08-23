@@ -4,7 +4,6 @@ import { supabase } from './lib/supabase';
 import { getRegisteredAccounts, saveRegisteredAccount, verifySchoolLogin, markAccountEmailVerified } from './services/accountService';
 import { verifyDeveloperCredentials } from './services/devAccountService';
 import { isEmailAlreadyVerified, sendEmailVerificationCode, getAppRedirectUrl } from './services/supabase';
-import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LeftHeroPanel } from './components/Auth/LeftHeroPanel';
 import { LoginCard } from './components/Auth/LoginCard';
@@ -126,7 +125,7 @@ export function App() {
     }
   }, [isLoggedIn, currentScreen, isDevAuthenticated, currentSchool, dashboardTab]);
 
-  // Simulated notifications system hook
+  // Simulated notifications system hook scoped to school
   const {
     notifications,
     unreadCount,
@@ -136,13 +135,11 @@ export function App() {
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
-    triggerSimulatedNotification,
+    addNotification,
     resetToDefault,
-    isAutoSimulate,
-    setIsAutoSimulate,
     soundEnabled,
     setSoundEnabled,
-  } = useNotifications();
+  } = useNotifications(currentSchool.code);
 
   // Selected notification for detail modal
   const [selectedNotification, setSelectedNotification] = useState<SystemNotification | null>(null);
@@ -157,6 +154,61 @@ export function App() {
       localStorage.removeItem('educongo_registration_draft_v2');
       localStorage.removeItem('educongo_registration_draft_v3');
     } catch {}
+  }, []);
+
+  // Subdomain & URL Query Route Resolver (edu-congo.netlify.app)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const requestedSchoolSlug = urlParams.get('school') || urlParams.get('subdomain') || urlParams.get('ecole');
+
+      let hostnameSubdomain: string | null = null;
+      const host = window.location.hostname;
+      if (host.includes('edu-congo.netlify.app')) {
+        const parts = host.split('.');
+        if (parts.length > 3 && parts[0] !== 'www' && parts[0] !== 'edu-congo') {
+          hostnameSubdomain = parts[0];
+        }
+      }
+
+      const targetSubdomain = requestedSchoolSlug || hostnameSubdomain;
+      if (targetSubdomain) {
+        const allAccounts = getRegisteredAccounts();
+        const matched = allAccounts.find(
+          (a) =>
+            (a.subdomain && a.subdomain.toLowerCase() === targetSubdomain.toLowerCase()) ||
+            (a.schoolCode && a.schoolCode.toLowerCase() === targetSubdomain.toLowerCase())
+        );
+
+        if (matched) {
+          setCurrentSchool({
+            name: matched.schoolName,
+            city: matched.city,
+            code: matched.schoolCode,
+            slogan: matched.slogan || 'Discipline - Travail - Succès',
+            logoUrl: matched.logoUrl || '',
+            subdomain: matched.subdomain || targetSubdomain,
+          });
+          setCurrentScreen('subdomain_portal');
+        } else {
+          const formattedName = targetSubdomain
+            .split('-')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+          setCurrentSchool({
+            name: formattedName,
+            city: 'Brazzaville',
+            code: targetSubdomain.toUpperCase().slice(0, 10),
+            slogan: 'Discipline - Travail - Succès',
+            logoUrl: '',
+            subdomain: targetSubdomain,
+          });
+          setCurrentScreen('subdomain_portal');
+        }
+      }
+    } catch (e) {
+      console.warn('Subdomain check error:', e);
+    }
   }, []);
 
   // Supabase Auth Session Listener & Auto-login with URL email confirmation parser
@@ -728,40 +780,6 @@ export function App() {
       <div className="glow-2"></div>
       <div className="glow-3"></div>
 
-      {/* Universal Top Header with Global Search & Notification Center (hidden on dev_panel to prevent duplicate header) */}
-      {currentScreen !== 'dev_panel' && (
-        <Header
-          currentScreen={currentScreen}
-          onNavigate={(screen) => setCurrentScreen(screen)}
-          canGoBack={canGoBack}
-          onGoBack={handleUniversalBack}
-          isLoggedIn={isLoggedIn}
-          schoolName={currentSchool.name}
-          onLogout={handleLogout}
-          onOpenAbout={() => setIsAboutModalOpen(true)}
-          onOpenHelp={() => setIsHelpModalOpen(true)}
-          onOpenDevPanel={handleOpenDevPanel}
-          // Global search handlers
-          onSelectStudent={handleSelectStudentFromSearch}
-          onSelectStaff={handleSelectStaffFromSearch}
-          onSelectDocument={handleSelectDocumentFromSearch}
-          // Notifications props
-          notifications={notifications}
-          unreadCount={unreadCount}
-          onMarkAsRead={markAsRead}
-          onMarkAllAsRead={markAllAsRead}
-          onDeleteNotification={deleteNotification}
-          onClearAllNotifications={clearAllNotifications}
-          onResetDefaultNotifications={resetToDefault}
-          onTriggerSimulation={triggerSimulatedNotification}
-          onSelectNotification={(notif) => setSelectedNotification(notif)}
-          isAutoSimulate={isAutoSimulate}
-          onToggleAutoSimulate={() => setIsAutoSimulate(!isAutoSimulate)}
-          soundEnabled={soundEnabled}
-          onToggleSound={() => setSoundEnabled(!soundEnabled)}
-        />
-      )}
-
       {/* Toast Notification Alert (Top-Right Pop-in) */}
       <ToastNotification
         notification={activeToast}
@@ -772,11 +790,6 @@ export function App() {
           dismissToast();
         }}
       />
-
-      {/* Connectivity Alert Banner */}
-      <div className="pt-3">
-        <OfflineAlertBanner />
-      </div>
 
       {/* Main Container */}
       <div className="relative z-10 flex-1 flex flex-col">
@@ -808,7 +821,11 @@ export function App() {
             slogan={currentSchool.slogan}
             logoUrl={currentSchool.logoUrl}
             subdomain={currentSchool.subdomain}
-            onBackToDashboard={() => setCurrentScreen(isLoggedIn ? 'dashboard' : 'auth')}
+            onOpenAdminLogin={() => {
+              setCurrentScreen('auth');
+              setAuthMode('login');
+            }}
+            onBackToMainPortal={() => setCurrentScreen(isLoggedIn ? 'dashboard' : 'auth')}
           />
         ) : currentScreen === 'dashboard' ? (
           <SchoolDashboard

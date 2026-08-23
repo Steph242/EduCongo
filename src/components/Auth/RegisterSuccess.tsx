@@ -62,8 +62,8 @@ export const RegisterSuccess: React.FC<RegisterSuccessProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Adresse web (Portail) :</span>
-            <span className="font-mono font-bold text-emerald-300 text-xs">
-              https://{formData.subdomain || 'mon-ecole'}.educongo.cg
+            <span className="font-mono font-bold text-emerald-300 text-xs truncate max-w-[200px]" title={`https://${formData.subdomain || 'mon-ecole'}.edu-congo.netlify.app`}>
+              https://{formData.subdomain || 'mon-ecole'}.edu-congo.netlify.app
             </span>
           </div>
           <div className="flex justify-between">

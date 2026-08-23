@@ -172,14 +172,25 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     student: null,
   });
 
-  // Bulletin inspection state - Safe initialization with fallback
-  const [selectedStudentForBulletin, setSelectedStudentForBulletin] = useState<Student>(() => {
+  // Bulletin inspection state - Safe initialization
+  const [selectedStudentForBulletin, setSelectedStudentForBulletin] = useState<Student | null>(() => {
     if (externalSelectedStudent) return externalSelectedStudent;
     const data = getSchoolData(schoolCode);
     if (data.students && data.students.length > 0) return data.students[0];
-    return DEFAULT_FALLBACK_STUDENT;
+    return null;
   });
   const [bulletinGrades] = useState<SubjectGrade[]>(SAMPLE_BULLETIN_GRADES);
+
+  // Sync selectedStudentForBulletin when students list updates
+  useEffect(() => {
+    if (students.length > 0) {
+      if (!selectedStudentForBulletin || !students.some((s) => s.id === selectedStudentForBulletin.id)) {
+        setSelectedStudentForBulletin(students[0]);
+      }
+    } else {
+      setSelectedStudentForBulletin(null);
+    }
+  }, [students]);
 
   // Left sidebar mobile state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -338,6 +349,10 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
 
   // Export handlers
   const handleExportStudentBulletinCSV = () => {
+    if (!selectedStudentForBulletin) {
+      showToast("⚠️ Aucun élève sélectionné.");
+      return;
+    }
     exportSingleStudentBulletinCSV(
       selectedStudentForBulletin,
       bulletinGrades,
@@ -348,6 +363,10 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
   };
 
   const handleExportStudentBulletinPDF = () => {
+    if (!selectedStudentForBulletin) {
+      showToast("⚠️ Aucun élève sélectionné.");
+      return;
+    }
     const gradesRows = bulletinGrades
       .map((g) => {
         const avg = (g.devoir1 + g.devoir2 + g.composition * 2) / 4;
@@ -2025,6 +2044,26 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               </div>
             </div>
 
+            {!selectedStudentForBulletin || students.length === 0 ? (
+              <div className="p-8 sm:p-12 text-center bg-white/[0.04] backdrop-blur-2xl rounded-3xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                  <span className="material-symbols-outlined text-[32px]">assignment</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Aucun élève inscrit</h3>
+                <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+                  Inscrivez des élèves dans votre établissement pour générer, imprimer et exporter leurs bulletins de notes officiels conformes au système MEPPSA du Congo.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddStudentOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">person_add</span>
+                  <span>+ Inscrire un premier élève</span>
+                </button>
+              </div>
+            ) : (
+            <>
             {/* Student Switcher and Complete Export Toolbar for Bulletin */}
             <div className="bg-white/[0.04] backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
@@ -2259,6 +2298,8 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </div>
               </div>
             </div>
+            </>
+            )}
           </div>
         )}
 
@@ -2431,6 +2472,26 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               </div>
             </div>
 
+            {!selectedStudentForBulletin || students.length === 0 ? (
+              <div className="p-8 sm:p-12 text-center bg-white/[0.04] backdrop-blur-2xl rounded-3xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                  <span className="material-symbols-outlined text-[32px]">verified</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Aucun élève inscrit</h3>
+                <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+                  Inscrivez des élèves pour délivrer leurs certificats et attestations de scolarité conformes au modèle officiel du MEPPSA Congo.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddStudentOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">person_add</span>
+                  <span>+ Inscrire un premier élève</span>
+                </button>
+              </div>
+            ) : (
+            <>
             <div className="bg-white/[0.04] backdrop-blur-xl p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
               <div>
                 <div className="text-xs font-semibold text-slate-200">
@@ -2509,6 +2570,8 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </div>
               </div>
             </div>
+            </>
+            )}
           </div>
         )}
         </>

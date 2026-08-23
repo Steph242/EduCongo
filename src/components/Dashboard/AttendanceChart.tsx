@@ -445,14 +445,14 @@ export const AttendanceChart: React.FC<AttendanceChartProps> = ({
 
       {/* Main Recharts Container */}
       <div className="w-full h-[340px] sm:h-[380px] pt-2">
-        {studentsCount === 0 ? (
+        {studentsCount === 0 || chartData.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
               <span className="material-symbols-outlined text-[28px]">analytics</span>
             </div>
             <h4 className="font-bold text-white text-base mb-1">Aucune donnée d'assiduité enregistrée</h4>
             <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-              Cet établissement démarre avec des compteurs à zéro. Dès l'inscription des premiers élèves et la validation de l'appel quotidien, les graphiques d'assiduité se généreront automatiquement en temps réel.
+              Cet établissement démarre avec des compteurs à zéro. Dès l'inscription des premiers élèves et la validation de l'appel quotidien par les enseignants, les statistiques d'assiduité apparaîtront ici.
             </p>
           </div>
         ) : (

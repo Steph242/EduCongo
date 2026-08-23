@@ -1,32 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SystemNotification, NotificationCategory } from '../types';
-import { INITIAL_NOTIFICATIONS, generateRandomNotification } from '../data/mockNotifications';
+import { SystemNotification } from '../types';
 
-const STORAGE_KEY = 'educongo_system_notifications';
+export function useNotifications(schoolCode?: string) {
+  const cleanCode = (schoolCode || '').toUpperCase().trim();
+  const storageKey = cleanCode ? `educongo_notifications_${cleanCode}` : 'educongo_notifications_global';
 
-export function useNotifications() {
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         return JSON.parse(saved);
       }
     } catch {}
-    return INITIAL_NOTIFICATIONS;
+    return [];
   });
 
   const [activeToast, setActiveToast] = useState<SystemNotification | null>(null);
-  const [isAutoSimulate, setIsAutoSimulate] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Save to localStorage
+  // Reload when schoolCode changes
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setNotifications(JSON.parse(saved));
+        return;
+      }
     } catch {}
-  }, [notifications]);
+    setNotifications([]);
+  }, [storageKey]);
 
-  // Audio chime using Web Audio API (gentle pleasant chime)
+  // Save to school-specific localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(notifications));
+    } catch {}
+  }, [notifications, storageKey]);
+
+  // Gentle pleasant audio chime
   const playChime = useCallback(() => {
     if (!soundEnabled) return;
     try {
@@ -57,40 +68,6 @@ export function useNotifications() {
     playChime();
   }, [playChime]);
 
-  const triggerSimulatedNotification = useCallback((customCategory?: NotificationCategory) => {
-    const newNotif = generateRandomNotification();
-    if (customCategory) {
-      newNotif.category = customCategory;
-      if (customCategory === 'registration') {
-        newNotif.title = "Nouvelle demande : Collège Fraternité (Brazzaville)";
-        newNotif.message = "Le dossier d'inscription pour l'année 2024-2025 avec 240 élèves a été soumis pour approbation.";
-        newNotif.schoolName = "Collège Privé Fraternité";
-        newNotif.department = "Brazzaville";
-        newNotif.city = "Brazzaville";
-        newNotif.schoolCode = "BZV-24-FRAT";
-        newNotif.contactPhone = "+242 06 880 12 34";
-      } else if (customCategory === 'payment') {
-        newNotif.title = "Paiement MTN Mobile Money reçu";
-        newNotif.message = "Règlement de 80 000 FCFA reçu pour frais de scolarité Trimestre 1 (+242 06 650 12 34).";
-        newNotif.amount = "80 000 FCFA";
-      } else if (customCategory === 'meppsa') {
-        newNotif.title = "Avis Officiel MEPPSA - Direction des Examens";
-        newNotif.message = "Transmission des bordereaux de notes du 1er semestre requise avant le 20 du mois.";
-      }
-    }
-    addNotification(newNotif);
-    return newNotif;
-  }, [addNotification]);
-
-  // Auto simulation timer
-  useEffect(() => {
-    if (!isAutoSimulate) return;
-    const interval = setInterval(() => {
-      triggerSimulatedNotification();
-    }, 40000); // every 40s
-    return () => clearInterval(interval);
-  }, [isAutoSimulate, triggerSimulatedNotification]);
-
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
@@ -110,7 +87,7 @@ export function useNotifications() {
   }, []);
 
   const resetToDefault = useCallback(() => {
-    setNotifications(INITIAL_NOTIFICATIONS);
+    setNotifications([]);
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -124,10 +101,10 @@ export function useNotifications() {
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
-    triggerSimulatedNotification,
+    addNotification,
     resetToDefault,
-    isAutoSimulate,
-    setIsAutoSimulate,
+    isAutoSimulate: false,
+    setIsAutoSimulate: () => {},
     soundEnabled,
     setSoundEnabled,
   };

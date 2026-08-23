@@ -17,14 +17,55 @@ export const LoginCard: React.FC<LoginCardProps> = ({
   onLoginWithSupabase,
   onForgotPassword,
 }) => {
-  const [loginMode, setLoginMode] = useState<LoginMode>('phone');
-  
-  // Credentials - empty by default so user can type real information
-  const [phone, setPhone] = useState('');
-  const [emailOrCode, setEmailOrCode] = useState('');
+  // Credentials - with Remember Me persistence
+  const [phone, setPhone] = useState(() => {
+    try {
+      const saved = localStorage.getItem('educongo_remember_me_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.rememberMe && parsed.mode === 'phone') {
+          return parsed.identifier || '';
+        }
+      }
+    } catch {}
+    return '';
+  });
+  const [emailOrCode, setEmailOrCode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('educongo_remember_me_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.rememberMe && parsed.mode === 'email') {
+          return parsed.identifier || '';
+        }
+      }
+    } catch {}
+    return '';
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try {
+      const saved = localStorage.getItem('educongo_remember_me_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Boolean(parsed.rememberMe);
+      }
+    } catch {}
+    return false;
+  });
+  const [loginMode, setLoginMode] = useState<LoginMode>(() => {
+    try {
+      const saved = localStorage.getItem('educongo_remember_me_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.rememberMe && (parsed.mode === 'phone' || parsed.mode === 'email')) {
+          return parsed.mode;
+        }
+      }
+    } catch {}
+    return 'phone';
+  });
   
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -89,12 +130,31 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
     const identifier = loginMode === 'phone' ? phone : emailOrCode;
 
+    const handleRememberMeSave = () => {
+      try {
+        if (rememberMe) {
+          localStorage.setItem(
+            'educongo_remember_me_v3',
+            JSON.stringify({
+              rememberMe: true,
+              mode: loginMode,
+              identifier,
+            })
+          );
+        } else {
+          localStorage.removeItem('educongo_remember_me_v3');
+        }
+      } catch {}
+    };
+
     try {
       if (onLoginWithSupabase) {
         const res = await onLoginWithSupabase(identifier, password, loginMode);
         setIsLoading(false);
         if (!res.success) {
           setErrorMsg(res.error || 'Identifiants ou mot de passe invalides.');
+        } else {
+          handleRememberMeSave();
         }
         return;
       }
@@ -106,6 +166,8 @@ export const LoginCard: React.FC<LoginCardProps> = ({
         setErrorMsg(result.errorMessage || 'Identifiants ou mot de passe invalides.');
         return;
       }
+
+      handleRememberMeSave();
 
       onLoginSuccess({
         name: result.account.schoolName,

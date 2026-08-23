@@ -29,7 +29,9 @@ export const SchoolSubdomainView: React.FC<SchoolSubdomainViewProps> = ({
   const [portalModalOpen, setPortalModalOpen] = useState(false);
   const [targetPortalRole, setTargetPortalRole] = useState<PortalRole>('parent');
 
-  const fullDomain = `${subdomain || 'etablissement'}.educongo.cg`;
+  const cleanSubdomain = (subdomain || 'etablissement').toLowerCase().trim();
+  const fullDomain = `${cleanSubdomain}.edu-congo.netlify.app`;
+  const universalUrl = `https://edu-congo.netlify.app/?school=${cleanSubdomain}`;
 
   const handleOpenRolePortal = (role: PortalRole) => {
     setTargetPortalRole(role);

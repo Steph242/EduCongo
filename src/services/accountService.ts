@@ -21,32 +21,14 @@ export function normalizeCongoPhone(phone: string): string {
 }
 
 /**
- * Default initial cycles for Congolese educational framework
+ * Initial cycles for educational framework - Pure empty state (configured by school admin)
  */
-export const DEFAULT_CONGO_CYCLES: SchoolCycle[] = [
-  { id: 'CYC-PRIM', name: 'Enseignement Primaire (CP1 - CM2)', code: 'PRIM', description: 'Cycle Fondamental 1' },
-  { id: 'CYC-COL', name: 'Collège d\'Enseignement Général (6ème - 3ème)', code: 'COL', description: 'Cycle Fondamental 2 (BEPC)' },
-  { id: 'CYC-LYC-GEN', name: 'Lycée d\'Enseignement Général (2nde - Tle)', code: 'LYC-GEN', description: 'Séries A4, C, D (Baccalauréat Général)' },
-  { id: 'CYC-LYC-TECH', name: 'Lycée Technique & Professionnel', code: 'LYC-TECH', description: 'Séries F3, F4, G2, BG (Baccalauréat Technique)' },
-  { id: 'CYC-SUP', name: 'Enseignement Supérieur & Université', code: 'SUP', description: 'Licence, Master, BTS' },
-];
+export const DEFAULT_CONGO_CYCLES: SchoolCycle[] = [];
 
 /**
- * Default initial classrooms for Congolese education
+ * Initial classrooms - Pure empty state (configured by school admin)
  */
-export const DEFAULT_CONGO_CLASSES: SchoolClassroom[] = [
-  { id: 'CLS-6A', name: '6ème A', cycleId: 'CYC-COL', cycleName: 'Collège', level: '6ème', section: 'A', capacity: 50, studentCount: 0 },
-  { id: 'CLS-5A', name: '5ème A', cycleId: 'CYC-COL', cycleName: 'Collège', level: '5ème', section: 'A', capacity: 50, studentCount: 0 },
-  { id: 'CLS-4A', name: '4ème A', cycleId: 'CYC-COL', cycleName: 'Collège', level: '4ème', section: 'A', capacity: 50, studentCount: 0 },
-  { id: 'CLS-3A', name: '3ème A', cycleId: 'CYC-COL', cycleName: 'Collège', level: '3ème', section: 'A', capacity: 50, studentCount: 0 },
-  { id: 'CLS-2C', name: '2nde C', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: '2nde', section: 'C', capacity: 45, studentCount: 0 },
-  { id: 'CLS-2A', name: '2nde A', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: '2nde', section: 'A', capacity: 45, studentCount: 0 },
-  { id: 'CLS-1D', name: 'Première D', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: '1ère', section: 'D', capacity: 45, studentCount: 0 },
-  { id: 'CLS-1C', name: 'Première C', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: '1ère', section: 'C', capacity: 40, studentCount: 0 },
-  { id: 'CLS-TD', name: 'Terminale D', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: 'Terminale', section: 'D', capacity: 45, studentCount: 0 },
-  { id: 'CLS-TC', name: 'Terminale C', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: 'Terminale', section: 'C', capacity: 40, studentCount: 0 },
-  { id: 'CLS-TA4', name: 'Terminale A4', cycleId: 'CYC-LYC-GEN', cycleName: 'Lycée Général', level: 'Terminale', section: 'A4', capacity: 50, studentCount: 0 },
-];
+export const DEFAULT_CONGO_CLASSES: SchoolClassroom[] = [];
 
 /**
  * Retrieves all registered school accounts from persistent storage.
@@ -98,8 +80,8 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
       teachers: [],
       payments: [],
       staff: [],
-      classes: DEFAULT_CONGO_CLASSES,
-      cycles: DEFAULT_CONGO_CYCLES,
+      classes: [],
+      cycles: [],
       schoolSettings: {
         academicYear: '2024 - 2025',
         currency: 'FCFA',
@@ -121,8 +103,8 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
         teachers: parsed.teachers || [],
         payments: parsed.payments || [],
         staff: parsed.staff || [],
-        classes: (parsed.classes && parsed.classes.length > 0) ? parsed.classes : DEFAULT_CONGO_CLASSES,
-        cycles: (parsed.cycles && parsed.cycles.length > 0) ? parsed.cycles : DEFAULT_CONGO_CYCLES,
+        classes: parsed.classes || [],
+        cycles: parsed.cycles || [],
         subscription: parsed.subscription,
         schoolSettings: parsed.schoolSettings || {
           academicYear: '2024 - 2025',
@@ -142,8 +124,8 @@ export function getSchoolData(schoolCode: string): SchoolCustomData {
     teachers: [],
     payments: [],
     staff: [],
-    classes: DEFAULT_CONGO_CLASSES,
-    cycles: DEFAULT_CONGO_CYCLES,
+    classes: [],
+    cycles: [],
     schoolSettings: {
       academicYear: '2024 - 2025',
       currency: 'FCFA',
