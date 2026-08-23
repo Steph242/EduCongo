@@ -25,6 +25,7 @@ import { DevAuthModal } from './components/DevControlPanel/DevAuthModal';
 import { OfflineAlertBanner } from './components/Common/OfflineAlertBanner';
 import { ToastNotification } from './components/Common/ToastNotification';
 import { useNotifications } from './hooks/useNotifications';
+import { syncAllCloudData } from './services/cloudSyncService';
 
 const EMPTY_REGISTRATION_DATA: SchoolRegistrationData = {
   schoolName: '',
@@ -106,6 +107,14 @@ export function App() {
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(() => {
     return Boolean(savedSession?.isDevAuthenticated);
   });
+  const [isDevImpersonating, setIsDevImpersonating] = useState(false);
+
+  // Sync data with Supabase Cloud on mount for PC/Phone cross-device consistency
+  useEffect(() => {
+    syncAllCloudData().catch((err) => {
+      console.warn('Initial cloud sync notice:', err);
+    });
+  }, []);
 
   // Save active session to localStorage whenever state changes
   useEffect(() => {
@@ -809,6 +818,7 @@ export function App() {
                 logoUrl: sch.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
                 subdomain: sch.subdomain || 'mon-ecole',
               });
+              setIsDevImpersonating(true);
               setIsLoggedIn(true);
               setCurrentScreen('dashboard');
             }}
@@ -839,6 +849,11 @@ export function App() {
             onOpenSubdomainView={() => setCurrentScreen('subdomain_portal')}
             externalSelectedTab={dashboardTab}
             externalSelectedStudent={dashboardStudent}
+            isImpersonating={isDevImpersonating}
+            onReturnToDevPanel={() => {
+              setIsDevImpersonating(false);
+              setCurrentScreen('dev_panel');
+            }}
           />
         ) : (
           <div className="flex-1 flex flex-col justify-center items-center py-4 sm:py-8 px-4 sm:px-6">

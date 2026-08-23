@@ -23,6 +23,7 @@ import { getSchoolData, saveSchoolData, getSchoolSubscription, getRegisteredAcco
 import { SchoolAdminConfigModal } from './SchoolAdminConfigModal';
 import { SchoolSubscriptionModal } from '../Subscription/SchoolSubscriptionModal';
 import { SubscriptionStatusBanner } from '../Subscription/SubscriptionStatusBanner';
+import { activateFreeTrial } from '../../services/subscriptionCodeService';
 import {
   exportSingleStudentBulletinCSV,
   exportClassGradeSheetCSV,
@@ -42,6 +43,8 @@ interface SchoolDashboardProps {
   onOpenSubdomainView?: () => void;
   externalSelectedTab?: TabType;
   externalSelectedStudent?: Student | null;
+  isImpersonating?: boolean;
+  onReturnToDevPanel?: () => void;
 }
 
 type TabType = 'overview' | 'attendance' | 'students' | 'bulletins' | 'finance' | 'staff' | 'certificates' | 'social';
@@ -88,10 +91,18 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
   onOpenSubdomainView,
   externalSelectedTab,
   externalSelectedStudent,
+  isImpersonating = false,
+  onReturnToDevPanel,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(externalSelectedTab || 'overview');
   const [tabHistory, setTabHistory] = useState<TabType[]>([]);
   const [activeRole, setActiveRole] = useState<'admin' | 'enseignant' | 'comptable' | 'secretaire' | 'eleve'>('admin');
+  
+  // School account & status check
+  const schoolAccount = getRegisteredAccounts().find(
+    (a) => a.schoolCode.toUpperCase() === schoolCode.toUpperCase()
+  );
+  const isSuspended = schoolAccount?.status === 'Suspendu';
   
   // School profile dynamic state
   const [schoolName, setSchoolName] = useState(initialSchoolName);
@@ -231,11 +242,11 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
     tuitionTotal: 0,
   });
 
-  // New payment form state - Safe fallback
+  // New payment form state - Cash only by default
   const [newPayment, setNewPayment] = useState({
     studentMatricule: '',
     amount: 50000,
-    paymentMethod: 'MTN Mobile Money' as PaymentRecord['paymentMethod'],
+    paymentMethod: 'Espèces' as PaymentRecord['paymentMethod'],
     month: 'Novembre 2024',
   });
 
@@ -1051,6 +1062,51 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
         {/* MAIN CONTENT AREA */}
         {/* ======================================================== */}
         <main className="flex-1 min-w-0 space-y-5">
+
+          {/* DEVELOPER IMPERSONATION BANNER (Requirement 2) */}
+          {isImpersonating && (
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-600 text-white px-4 sm:px-5 py-3 rounded-2xl sm:rounded-3xl shadow-xl flex flex-wrap items-center justify-between gap-3 border border-blue-400/40 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-yellow-300">
+                  <span className="material-symbols-outlined text-[20px] animate-pulse">admin_panel_settings</span>
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider text-blue-200">
+                    Console Développeur • Prise de Contrôle Active
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold text-white">
+                    Vous gérez actuellement : <span className="underline decoration-yellow-400">{schoolName}</span> (<span className="font-mono text-yellow-300">{schoolCode}</span>)
+                  </div>
+                </div>
+              </div>
+
+              {onReturnToDevPanel && (
+                <button
+                  type="button"
+                  onClick={onReturnToDevPanel}
+                  className="px-4 py-2 rounded-xl bg-slate-950/90 hover:bg-slate-950 text-blue-200 hover:text-white font-black text-xs flex items-center gap-2 border border-white/25 transition-all cursor-pointer shadow-lg active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                  <span>Retourner à la Console Développeur</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* SUSPENDED SCHOOL WARNING BANNER (Requirement 3) */}
+          {isSuspended && (
+            <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs sm:text-sm flex items-start gap-3 shadow-lg">
+              <span className="material-symbols-outlined text-amber-400 text-[24px] shrink-0">warning</span>
+              <div className="space-y-1">
+                <strong className="text-amber-300 font-bold block text-sm">
+                  ⚠️ ÉTABLISSEMENT SUSPENDU (Mode Lecture Seule)
+                </strong>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Cet établissement fait l'objet d'une suspension temporaire décidée par l'administration centrale. Toutes les actions (création, modification, encaissement de frais, saisie de notes) sont verrouillées en lecture seule. Seules la consultation des données et la déconnexion sont autorisées.
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Executive Header Banner with Breadcrumbs & Back Navigation */}
           <div className="bg-white/[0.04] backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/10 p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] space-y-3.5">
@@ -1145,7 +1201,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setIsAdminConfigModalOpen(true)}
+                  onClick={() => {
+                    if (isSuspended) {
+                      showToast("⚠️ Action indisponible : Établissement suspendu (Mode lecture seule).");
+                      return;
+                    }
+                    setIsAdminConfigModalOpen(true);
+                  }}
                   className="px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 border border-indigo-400/30 shadow-[0_0_15px_rgba(99,102,241,0.25)] cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">tune</span>
@@ -1161,7 +1223,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsAddStudentOpen(true)}
+                  onClick={() => {
+                    if (isSuspended) {
+                      showToast("⚠️ Action indisponible : Établissement suspendu (Mode lecture seule).");
+                      return;
+                    }
+                    setIsAddStudentOpen(true);
+                  }}
                   className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:from-emerald-500 hover:to-teal-500 transition-all flex items-center gap-1.5 border border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.25)] cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">person_add</span>
@@ -1169,7 +1237,13 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsNewPaymentOpen(true)}
+                  onClick={() => {
+                    if (isSuspended) {
+                      showToast("⚠️ Action indisponible : Établissement suspendu (Mode lecture seule).");
+                      return;
+                    }
+                    setIsNewPaymentOpen(true);
+                  }}
                   className="px-3.5 py-2 bg-indigo-600/30 text-indigo-200 hover:bg-indigo-600/40 border border-indigo-500/40 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 backdrop-blur-md cursor-pointer active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">payments</span>
@@ -1182,44 +1256,12 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
             <SubscriptionStatusBanner
               subscription={subscription}
               onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
+              onActivateFreeTrial={() => {
+                const newSub = activateFreeTrial(schoolCode);
+                setSubscription(newSub);
+                showToast("🎉 Période d'essai gratuit de 14 jours activée avec succès !");
+              }}
             />
-
-            {/* Profile / Role Selector Bar (RBAC System - Requirement 5) */}
-            <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400 text-[18px]">account_circle</span>
-                <span className="text-xs font-bold text-slate-300">Profil Actif :</span>
-                <span className="text-[11px] text-slate-400 hidden sm:inline">(Simuler l'interface selon le profil)</span>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
-                {[
-                  { id: 'admin', label: 'Proviseur / Admin', icon: 'shield_person' },
-                  { id: 'enseignant', label: 'Enseignant', icon: 'cast_for_education' },
-                  { id: 'comptable', label: 'Comptable (Caisse)', icon: 'payments' },
-                  { id: 'secretaire', label: 'Secrétariat', icon: 'badge' },
-                  { id: 'eleve', label: 'Élève / Étudiant', icon: 'school' },
-                ].map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveRole(r.id as any);
-                      if (r.id === 'comptable') navigateToTab('finance');
-                      if (r.id === 'secretaire') navigateToTab('students');
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                      activeRole === r.id
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)] border border-emerald-400/40'
-                        : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/5'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[15px]">{r.icon}</span>
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
         {/* ==================== ROLE-SPECIFIC WORKSPACES ==================== */}
@@ -3150,56 +3192,20 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Mode de règlement */}
+              {/* Mode de règlement - Espèces / Caisse manuelle */}
               <div>
-                <label className="block font-medium text-slate-300 mb-1">Mode de Paiement Authentifié</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewPayment({ ...newPayment, paymentMethod: 'MTN Mobile Money' })}
-                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                      newPayment.paymentMethod === 'MTN Mobile Money'
-                        ? 'border-yellow-400/50 bg-yellow-500/20 text-yellow-300 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
-                        : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <span>MTN MoMo</span>
-                    <span className="text-[10px] font-bold bg-yellow-400 text-slate-950 px-1 rounded">242</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewPayment({ ...newPayment, paymentMethod: 'Airtel Money' })}
-                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                      newPayment.paymentMethod === 'Airtel Money'
-                        ? 'border-red-400/50 bg-red-500/20 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.2)]'
-                        : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <span>Airtel Money</span>
-                    <span className="text-[10px] font-bold bg-red-500 text-white px-1 rounded">242</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewPayment({ ...newPayment, paymentMethod: 'Espèces' })}
-                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
-                      newPayment.paymentMethod === 'Espèces'
-                        ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                        : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    Espèces (Caisse)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewPayment({ ...newPayment, paymentMethod: 'Virement BGFI' })}
-                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
-                      newPayment.paymentMethod === 'Virement BGFI'
-                        ? 'border-blue-400/50 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
-                        : 'border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    Virement Bancaire
-                  </button>
+                <label className="block font-medium text-slate-300 mb-1">Mode d'Encaissement Officiel</label>
+                <div className="p-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-emerald-400 text-[22px]">point_of_sale</span>
+                    <div>
+                      <div className="text-xs font-bold text-white">Espèces (Caisse Centrale de l'Établissement)</div>
+                      <div className="text-[11px] text-emerald-300/80">Confirmation manuelle & édition immédiate du reçu officiel</div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-400/30">
+                    MANUEL
+                  </span>
                 </div>
               </div>
 

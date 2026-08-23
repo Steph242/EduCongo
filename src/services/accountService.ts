@@ -31,6 +31,17 @@ export const DEFAULT_CONGO_CYCLES: SchoolCycle[] = [];
 export const DEFAULT_CONGO_CLASSES: SchoolClassroom[] = [];
 
 /**
+ * Saves the full list of registered accounts
+ */
+export function saveRegisteredAccountsList(accounts: RegisteredSchoolAccount[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+  } catch (err) {
+    console.error('Error saving registered accounts list:', err);
+  }
+}
+
+/**
  * Retrieves all registered school accounts from persistent storage.
  * Genuine registered schools are stored here.
  */
@@ -208,10 +219,10 @@ export function getSchoolSubscription(schoolCode: string): SchoolSubscription {
   // Default initial pending trial subscription
   const defaultSub: SchoolSubscription = {
     plan: 'trial_pending',
-    planName: 'Essai 14 Jours (En attente d\'activation)',
+    planName: "Essai Gratuit 14 Jours (En attente d'activation)",
     status: 'pending_payment',
     membershipFeePaid: false,
-    membershipFeeAmount: 2500,
+    membershipFeeAmount: 0,
     monthlyFee: 10000,
   };
 
@@ -219,23 +230,23 @@ export function getSchoolSubscription(schoolCode: string): SchoolSubscription {
 }
 
 /**
- * Activate 14-day trial after payment of 2 500 FCFA membership fee
+ * Activate 100% Free 14-day trial (0 FCFA, no membership fee)
  */
 export function activateSchoolTrial(
   schoolCode: string,
-  paymentMethod: SchoolSubscription['paymentMethod'] = 'MTN Mobile Money',
+  paymentMethod: SchoolSubscription['paymentMethod'] = 'Espèces / Virement',
   transactionRef?: string
 ): SchoolSubscription {
   const now = new Date();
   const endDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const ref = transactionRef || `ADHESION-2500-${Date.now().toString(36).toUpperCase()}`;
+  const ref = transactionRef || `ESSAI-GRATUIT-${Date.now().toString(36).toUpperCase()}`;
 
   const activatedSubscription: SchoolSubscription = {
     plan: 'trial_active',
-    planName: 'Période d\'Essai Illimitée (14 Jours)',
+    planName: "Période d'Essai Gratuite (14 Jours)",
     status: 'trial',
     membershipFeePaid: true,
-    membershipFeeAmount: 2500,
+    membershipFeeAmount: 0,
     trialStartDate: now.toISOString(),
     trialEndDate: endDate.toISOString(),
     trialDaysRemaining: 14,
@@ -257,7 +268,7 @@ export function activateSchoolTrial(
 export function updateSchoolSubscriptionPlan(
   schoolCode: string,
   plan: 'standard' | 'premium',
-  paymentMethod: SchoolSubscription['paymentMethod'] = 'MTN Mobile Money',
+  paymentMethod: SchoolSubscription['paymentMethod'] = 'Espèces / Virement',
   transactionRef?: string
 ): SchoolSubscription {
   const now = new Date();
@@ -270,7 +281,7 @@ export function updateSchoolSubscriptionPlan(
     planName: plan === 'premium' ? 'Plan Premium Multi-Cycles (15 000 FCFA / mois)' : 'Plan Standard (10 000 FCFA / mois)',
     status: 'active',
     membershipFeePaid: true,
-    membershipFeeAmount: 2500,
+    membershipFeeAmount: 0,
     monthlyFee,
     lastPaymentDate: now.toISOString(),
     nextBillingDate: nextMonth.toISOString(),
@@ -385,10 +396,10 @@ export async function saveRegisteredAccount(data: SchoolRegistrationData): Promi
 
   const initialSubscription: SchoolSubscription = {
     plan: 'trial_pending',
-    planName: 'Essai 14 Jours (Adhésion 2 500 FCFA)',
+    planName: "Essai Gratuit 14 Jours (En attente d'activation)",
     status: 'pending_payment',
     membershipFeePaid: false,
-    membershipFeeAmount: 2500,
+    membershipFeeAmount: 0,
     monthlyFee: 10000,
   };
 
@@ -551,6 +562,16 @@ export function verifySchoolLogin(
         mode === 'phone'
           ? `Aucun compte établissement n'est enregistré avec le numéro ${trimmedId}. Veuillez d'abord créer un compte.`
           : `Aucun compte établissement n'est enregistré avec l'identifiant "${trimmedId}". Veuillez vérifier la saisie ou créer un compte.`,
+    };
+  }
+
+  // Verify school status (Requirement 3)
+  if (matchedAccount.status === 'Désactivé' || matchedAccount.status === 'Inactif') {
+    return {
+      success: false,
+      error: 'ACCOUNT_NOT_FOUND',
+      errorMessage: "Cet établissement a été désactivé par l'administration centrale. L'accès est strictement inaccessible pour l'ensemble des utilisateurs.",
+      account: matchedAccount,
     };
   }
 

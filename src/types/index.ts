@@ -65,7 +65,7 @@ export interface RegisteredSchoolAccount {
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   registeredAt: string;
-  status: 'Actif' | 'En attente' | 'Validé';
+  status: 'Actif' | 'En attente' | 'Validé' | 'Suspendu' | 'Désactivé' | 'Inactif';
   subscription?: SchoolSubscription;
   documents: {
     agrementFile: string | null;
@@ -80,15 +80,15 @@ export interface SchoolSubscription {
   plan: SubscriptionPlanType;
   planName: string;
   status: 'active' | 'pending_payment' | 'expired' | 'trial';
-  membershipFeePaid: boolean;
-  membershipFeeAmount: number; // 2500 FCFA
+  membershipFeePaid?: boolean;
+  membershipFeeAmount?: number;
   trialStartDate?: string;
   trialEndDate?: string;
   trialDaysRemaining?: number;
   monthlyFee: number; // 10000 (standard) or 15000 (premium)
   lastPaymentDate?: string;
   nextBillingDate?: string;
-  paymentMethod?: 'MTN Mobile Money' | 'Airtel Money' | 'Carte Bancaire' | 'Espèces / Virement';
+  paymentMethod?: 'Espèces / Virement' | 'Carte Bancaire' | 'Espèces' | 'MTN Mobile Money' | 'Airtel Money';
   transactionReference?: string;
 }
 
