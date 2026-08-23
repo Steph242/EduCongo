@@ -36,17 +36,17 @@ import { CONGO_DEPARTMENTS, CONGO_CITIES } from '../../data/mockData';
 import { ThemeToggle } from '../Common/ThemeToggle';
 
 interface DevControlPanelProps {
-  onBackToApp: () => void;
   onImpersonateSchool: (school: RegisteredSchoolAccount) => void;
-  onOpenPortal: (school: RegisteredSchoolAccount) => void;
+  onLogout: () => void;
+  onGoHome: () => void;
 }
 
 type DevTab = 'schools' | 'dev_accounts' | 'audit' | 'microservices' | 'console' | 'broadcast' | 'sandbox';
 
 export const DevControlPanel: React.FC<DevControlPanelProps> = ({
-  onBackToApp,
   onImpersonateSchool,
-  onOpenPortal,
+  onLogout,
+  onGoHome,
 }) => {
   const [activeTab, setActiveTab] = useState<DevTab>('schools');
   const [schools, setSchools] = useState<RegisteredSchoolAccount[]>(getRegisteredSchools);
@@ -459,27 +459,38 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 font-sans pb-16">
       {/* Top Root Bar */}
-      <div className="border-b border-indigo-500/20 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div className="border-b border-blue-500/20 bg-slate-950/85 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.5)]">
-            <span className="material-symbols-outlined text-white text-[24px]">terminal</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-white text-base sm:text-lg tracking-wide flex items-center gap-1.5">
-                EduCongo Control Panel <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-400/40 text-indigo-300">ROOT DEV & SUPER ADMIN</span>
-              </h1>
+          {/* Logo EC & EduCongo - Clickable to return to Login Screen / Home */}
+          <button
+            type="button"
+            onClick={onGoHome}
+            title="Aller à l'écran de connexion / Page d'accueil EduCongo"
+            className="flex items-center gap-3 text-left group cursor-pointer transition-transform active:scale-95 focus:outline-none"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-400 p-[1.5px] shadow-[0_0_20px_rgba(37,99,235,0.45)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.65)] group-hover:scale-105 transition-all">
+              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-black text-lg text-blue-400 group-hover:text-white transition-colors">
+                EC
+              </div>
             </div>
-            <p className="text-xs text-slate-400">
-              Surveillance nationale, audit complet, gestion des établissements & console développeur
-            </p>
-          </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-white text-base sm:text-lg tracking-wide group-hover:text-blue-300 transition-colors flex items-center gap-1.5">
+                  EduCongo <span className="text-slate-300 font-semibold text-sm">Control Panel</span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300">ROOT DEV</span>
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition-colors">
+                République du Congo • Console Système & Super-Admin
+              </p>
+            </div>
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Active Dev Profile */}
-          <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-xs">
-            <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-[11px] shadow-sm">
+          <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs">
+            <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[11px] shadow-sm">
               {currentDev.fullName ? currentDev.fullName.charAt(0) : 'D'}
             </div>
             <div>
@@ -487,24 +498,26 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                 <span>{currentDev.fullName}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               </div>
-              <div className="text-[10px] text-indigo-300 font-mono truncate max-w-[180px]">{currentDev.email}</div>
+              <div className="text-[10px] text-blue-300 font-mono truncate max-w-[180px]">{currentDev.email}</div>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
             CLUSTER BZV: CONNECTÉ (18ms)
           </div>
 
           <ThemeToggle />
 
+          {/* Déconnexion Button (Functional) */}
           <button
             type="button"
-            onClick={onBackToApp}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all border border-white/15 shadow-sm cursor-pointer"
+            onClick={onLogout}
+            title="Se déconnecter de la console développeur"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 text-xs font-bold transition-all border border-rose-500/30 shadow-sm cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Retour à l'Application
+            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span>Déconnexion</span>
           </button>
         </div>
       </div>
@@ -599,7 +612,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
               onClick={() => setActiveTab(tab.id as DevTab)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/30'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.45)] border border-blue-400/40'
                   : 'text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] border border-white/5'
               }`}
             >
@@ -2065,7 +2078,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2073,22 +2086,10 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                     setInspectingSchool(null);
                     onImpersonateSchool(target);
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-[0.99]"
                 >
                   <span className="material-symbols-outlined text-[16px]">bolt</span>
-                  Prendre le Contrôle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = inspectingSchool;
-                    setInspectingSchool(null);
-                    onOpenPortal(target);
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                  Ouvrir Portail Public
+                  Prendre le Contrôle de l'Établissement
                 </button>
               </div>
             </div>

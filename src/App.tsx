@@ -316,7 +316,6 @@ export function App() {
 
   const canGoBack = Boolean(
     hasActiveModal ||
-    currentScreen === 'dev_panel' ||
     currentScreen === 'subdomain_portal' ||
     (currentScreen === 'auth' && authMode !== 'login') ||
     (currentScreen === 'dashboard' && dashboardTab !== 'overview')
@@ -729,37 +728,39 @@ export function App() {
       <div className="glow-2"></div>
       <div className="glow-3"></div>
 
-      {/* Universal Top Header with Global Search & Notification Center */}
-      <Header
-        currentScreen={currentScreen}
-        onNavigate={(screen) => setCurrentScreen(screen)}
-        canGoBack={canGoBack}
-        onGoBack={handleUniversalBack}
-        isLoggedIn={isLoggedIn}
-        schoolName={currentSchool.name}
-        onLogout={handleLogout}
-        onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenHelp={() => setIsHelpModalOpen(true)}
-        onOpenDevPanel={handleOpenDevPanel}
-        // Global search handlers
-        onSelectStudent={handleSelectStudentFromSearch}
-        onSelectStaff={handleSelectStaffFromSearch}
-        onSelectDocument={handleSelectDocumentFromSearch}
-        // Notifications props
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAsRead={markAsRead}
-        onMarkAllAsRead={markAllAsRead}
-        onDeleteNotification={deleteNotification}
-        onClearAllNotifications={clearAllNotifications}
-        onResetDefaultNotifications={resetToDefault}
-        onTriggerSimulation={triggerSimulatedNotification}
-        onSelectNotification={(notif) => setSelectedNotification(notif)}
-        isAutoSimulate={isAutoSimulate}
-        onToggleAutoSimulate={() => setIsAutoSimulate(!isAutoSimulate)}
-        soundEnabled={soundEnabled}
-        onToggleSound={() => setSoundEnabled(!soundEnabled)}
-      />
+      {/* Universal Top Header with Global Search & Notification Center (hidden on dev_panel to prevent duplicate header) */}
+      {currentScreen !== 'dev_panel' && (
+        <Header
+          currentScreen={currentScreen}
+          onNavigate={(screen) => setCurrentScreen(screen)}
+          canGoBack={canGoBack}
+          onGoBack={handleUniversalBack}
+          isLoggedIn={isLoggedIn}
+          schoolName={currentSchool.name}
+          onLogout={handleLogout}
+          onOpenAbout={() => setIsAboutModalOpen(true)}
+          onOpenHelp={() => setIsHelpModalOpen(true)}
+          onOpenDevPanel={handleOpenDevPanel}
+          // Global search handlers
+          onSelectStudent={handleSelectStudentFromSearch}
+          onSelectStaff={handleSelectStaffFromSearch}
+          onSelectDocument={handleSelectDocumentFromSearch}
+          // Notifications props
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onDeleteNotification={deleteNotification}
+          onClearAllNotifications={clearAllNotifications}
+          onResetDefaultNotifications={resetToDefault}
+          onTriggerSimulation={triggerSimulatedNotification}
+          onSelectNotification={(notif) => setSelectedNotification(notif)}
+          isAutoSimulate={isAutoSimulate}
+          onToggleAutoSimulate={() => setIsAutoSimulate(!isAutoSimulate)}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+        />
+      )}
 
       {/* Toast Notification Alert (Top-Right Pop-in) */}
       <ToastNotification
@@ -781,7 +782,11 @@ export function App() {
       <div className="relative z-10 flex-1 flex flex-col">
         {currentScreen === 'dev_panel' ? (
           <DevControlPanel
-            onBackToApp={() => setCurrentScreen(isLoggedIn ? 'dashboard' : 'auth')}
+            onLogout={handleLogout}
+            onGoHome={() => {
+              setCurrentScreen('auth');
+              setAuthMode('login');
+            }}
             onImpersonateSchool={(sch) => {
               setCurrentSchool({
                 name: sch.schoolName,
@@ -793,17 +798,6 @@ export function App() {
               });
               setIsLoggedIn(true);
               setCurrentScreen('dashboard');
-            }}
-            onOpenPortal={(sch) => {
-              setCurrentSchool({
-                name: sch.schoolName,
-                city: sch.city,
-                code: sch.schoolCode,
-                slogan: sch.slogan || 'Discipline - Travail - Succès',
-                logoUrl: sch.logoUrl || 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=300&q=80',
-                subdomain: sch.subdomain || 'mon-ecole',
-              });
-              setCurrentScreen('subdomain_portal');
             }}
           />
         ) : currentScreen === 'subdomain_portal' ? (
