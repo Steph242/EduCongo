@@ -43,6 +43,8 @@ export interface SchoolRegistrationData {
   };
 }
 
+export type SchoolStatus = 'Actif' | 'Suspendu' | 'Désactivé';
+
 export interface RegisteredSchoolAccount {
   id: string;
   schoolName: string;
@@ -65,7 +67,7 @@ export interface RegisteredSchoolAccount {
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   registeredAt: string;
-  status: 'Actif' | 'En attente' | 'Validé' | 'Suspendu' | 'Désactivé' | 'Inactif';
+  status: SchoolStatus;
   subscription?: SchoolSubscription;
   documents: {
     agrementFile: string | null;

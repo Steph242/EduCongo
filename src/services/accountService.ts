@@ -1,8 +1,9 @@
-import { SchoolRegistrationData, RegisteredSchoolAccount, SchoolSubscription, SubscriptionPlanType, SchoolCycle, SchoolClassroom, StaffAccount } from '../types';
-import { registerSchoolWithSupabase } from './supabase';
+import { SchoolRegistrationData, RegisteredSchoolAccount, SchoolSubscription, SubscriptionPlanType, SchoolCycle, SchoolClassroom, StaffAccount, SchoolStatus } from '../types';
+import { registerSchoolWithSupabase, supabase, isSupabaseConfigured } from './supabase';
 
 const STORAGE_KEY = 'educongo_registered_schools_prod_v3';
 const SCHOOL_DATA_STORAGE_KEY_PREFIX = 'educongo_school_data_prod_v3_';
+const DELETED_SCHOOLS_BLACKLIST_KEY = 'educongo_deleted_school_codes_v3';
 
 /**
  * Normalizes phone numbers for accurate Congolese telecom matching
@@ -21,6 +22,47 @@ export function normalizeCongoPhone(phone: string): string {
 }
 
 /**
+ * Retrieves the blacklist of explicitly deleted school codes
+ */
+export function getDeletedSchoolCodes(): string[] {
+  try {
+    const raw = localStorage.getItem(DELETED_SCHOOLS_BLACKLIST_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((c: string) => c.toUpperCase().trim());
+    }
+  } catch {}
+  return [];
+}
+
+/**
+ * Blacklists a deleted school code so it is NEVER restored from remote sync
+ */
+export function recordDeletedSchoolCode(code: string): void {
+  if (!code) return;
+  const clean = code.toUpperCase().trim();
+  const current = getDeletedSchoolCodes();
+  if (!current.includes(clean)) {
+    current.push(clean);
+    try {
+      localStorage.setItem(DELETED_SCHOOLS_BLACKLIST_KEY, JSON.stringify(current));
+    } catch {}
+  }
+}
+
+/**
+ * Removes a school code from the blacklist (e.g. if newly created)
+ */
+export function removeDeletedSchoolCode(code: string): void {
+  if (!code) return;
+  const clean = code.toUpperCase().trim();
+  const current = getDeletedSchoolCodes().filter((c) => c !== clean);
+  try {
+    localStorage.setItem(DELETED_SCHOOLS_BLACKLIST_KEY, JSON.stringify(current));
+  } catch {}
+}
+
+/**
  * Initial cycles for educational framework - Pure empty state (configured by school admin)
  */
 export const DEFAULT_CONGO_CYCLES: SchoolCycle[] = [];
@@ -35,7 +77,9 @@ export const DEFAULT_CONGO_CLASSES: SchoolClassroom[] = [];
  */
 export function saveRegisteredAccountsList(accounts: RegisteredSchoolAccount[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+    const deletedCodes = new Set(getDeletedSchoolCodes());
+    const filtered = accounts.filter((a) => !deletedCodes.has(a.schoolCode.toUpperCase().trim()));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
   } catch (err) {
     console.error('Error saving registered accounts list:', err);
   }
@@ -47,11 +91,12 @@ export function saveRegisteredAccountsList(accounts: RegisteredSchoolAccount[]):
  */
 export function getRegisteredAccounts(): RegisteredSchoolAccount[] {
   try {
+    const deletedCodes = new Set(getDeletedSchoolCodes());
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.filter((a: RegisteredSchoolAccount) => !deletedCodes.has(a.schoolCode?.toUpperCase().trim()));
       }
     }
   } catch (err) {
