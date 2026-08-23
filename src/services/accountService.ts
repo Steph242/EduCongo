@@ -302,50 +302,79 @@ export function updateSchoolSubscriptionPlan(
 }
 
 /**
+ * Check if a school name is already taken (case-insensitive)
+ */
+export function isSchoolNameTaken(schoolName: string, excludeCode?: string): boolean {
+  if (!schoolName) return false;
+  const accounts = getRegisteredAccounts();
+  const cleanName = schoolName.trim().toLowerCase();
+  const exclude = (excludeCode || '').trim().toUpperCase();
+  return accounts.some((acc) => {
+    if (exclude && acc.schoolCode.toUpperCase() === exclude) return false;
+    return (acc.schoolName || '').trim().toLowerCase() === cleanName;
+  });
+}
+
+/**
  * Check if a school code is already taken
  */
-export function isSchoolCodeTaken(schoolCode: string): boolean {
+export function isSchoolCodeTaken(schoolCode: string, excludeCode?: string): boolean {
   if (!schoolCode) return false;
   const accounts = getRegisteredAccounts();
-  return accounts.some((acc) => acc.schoolCode.toUpperCase() === schoolCode.toUpperCase().trim());
+  const cleanCode = schoolCode.toUpperCase().trim();
+  const exclude = (excludeCode || '').trim().toUpperCase();
+  return accounts.some((acc) => {
+    if (exclude && acc.schoolCode.toUpperCase() === exclude) return false;
+    return acc.schoolCode.toUpperCase().trim() === cleanCode;
+  });
 }
 
 /**
  * Check if a work email is already taken
  */
-export function isWorkEmailTaken(email: string): boolean {
+export function isWorkEmailTaken(email: string, excludeCode?: string): boolean {
   if (!email) return false;
   const accounts = getRegisteredAccounts();
   const cleanEmail = email.toLowerCase().trim();
-  return accounts.some(
-    (acc) =>
+  const exclude = (excludeCode || '').trim().toUpperCase();
+  return accounts.some((acc) => {
+    if (exclude && acc.schoolCode.toUpperCase() === exclude) return false;
+    return (
       (acc.workEmail && acc.workEmail.toLowerCase().trim() === cleanEmail) ||
       (acc.personalEmail && acc.personalEmail.toLowerCase().trim() === cleanEmail)
-  );
+    );
+  });
 }
 
 /**
  * Check if a phone number is already registered
  */
-export function isPhoneTaken(phone: string): boolean {
+export function isPhoneTaken(phone: string, excludeCode?: string): boolean {
   const normInput = normalizeCongoPhone(phone);
-  if (!normInput) return false;
+  if (!normInput || normInput.length < 6) return false;
   const accounts = getRegisteredAccounts();
-  return accounts.some(
-    (acc) =>
+  const exclude = (excludeCode || '').trim().toUpperCase();
+  return accounts.some((acc) => {
+    if (exclude && acc.schoolCode.toUpperCase() === exclude) return false;
+    return (
       normalizeCongoPhone(acc.workPhone) === normInput ||
       normalizeCongoPhone(acc.personalPhone) === normInput
-  );
+    );
+  });
 }
 
 /**
  * Check if a subdomain is already taken
  */
-export function isSubdomainTaken(subdomain: string): boolean {
+export function isSubdomainTaken(subdomain: string, excludeCode?: string): boolean {
   if (!subdomain) return false;
   const cleanSub = subdomain.toLowerCase().trim();
   const accounts = getRegisteredAccounts();
-  return accounts.some((acc) => (acc.subdomain || '').toLowerCase().trim() === cleanSub);
+  const exclude = (excludeCode || '').trim().toUpperCase();
+  return accounts.some((acc) => {
+    if (exclude && acc.schoolCode.toUpperCase() === exclude) return false;
+    return (acc.subdomain || '').toLowerCase().trim() === cleanSub;
+  });
 }
 
 /**
@@ -353,6 +382,24 @@ export function isSubdomainTaken(subdomain: string): boolean {
  */
 export async function saveRegisteredAccount(data: SchoolRegistrationData): Promise<RegisteredSchoolAccount> {
   const accounts = getRegisteredAccounts();
+
+  // Validate strict uniqueness constraints
+  if (isSchoolNameTaken(data.schoolName)) {
+    throw new Error(`Un établissement portant le nom "${data.schoolName}" est déjà enregistré sur EduCongo.`);
+  }
+
+  if (isWorkEmailTaken(data.workEmail)) {
+    throw new Error(`L'adresse e-mail "${data.workEmail}" est déjà associée à un établissement enregistré.`);
+  }
+
+  if (isPhoneTaken(data.workPhone)) {
+    throw new Error(`Le numéro de téléphone (+242) "${data.workPhone}" est déjà associé à un établissement.`);
+  }
+
+  const finalSubdomain = (data.subdomain || data.schoolName.toLowerCase().replace(/[^a-z0-9]/g, '-')).toLowerCase().trim();
+  if (isSubdomainTaken(finalSubdomain)) {
+    throw new Error(`Le sous-domaine "${finalSubdomain}" est déjà utilisé.`);
+  }
 
   const initialSubscription: SchoolSubscription = {
     plan: 'trial_pending',

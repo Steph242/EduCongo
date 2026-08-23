@@ -5,6 +5,12 @@ import {
   CONGO_DEPARTMENTS_CONFIG, 
   generateSchoolCode 
 } from '../../data/mockData';
+import { 
+  isSchoolNameTaken, 
+  isWorkEmailTaken, 
+  isPhoneTaken, 
+  isSubdomainTaken 
+} from '../../services/accountService';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { FormFieldBadge, FormFieldFeedback } from '../Common/FormFieldValidation';
 import { VerificationModal } from './VerificationModal';
@@ -97,7 +103,15 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
 
   // Validation rules computed in real-time
   const fieldValidation = useMemo(() => {
-    const isSchoolNameValid = Boolean(formData.schoolName && formData.schoolName.trim().length >= 3);
+    const isSchoolNameLengthValid = Boolean(formData.schoolName && formData.schoolName.trim().length >= 3);
+    const isSchoolNameUnique = !isSchoolNameTaken(formData.schoolName);
+    const isSchoolNameValid = isSchoolNameLengthValid && isSchoolNameUnique;
+
+    const currentSub = (formData.subdomain || suggestedSubdomain || '').toLowerCase().trim();
+    const isSubdomainFormatValid = Boolean(currentSub && /^[a-z0-9-]+$/.test(currentSub) && currentSub.length >= 3);
+    const isSubdomainUnique = !isSubdomainTaken(currentSub);
+    const isSubdomainValid = isSubdomainFormatValid && isSubdomainUnique;
+
     const isDepartmentValid = Boolean(formData.department && formData.department.trim().length > 0);
     const isCityValid = Boolean(formData.city && formData.city.trim().length > 0);
     const isArrondissementValid = Boolean(formData.arrondissement && formData.arrondissement.trim().length > 0);
@@ -105,22 +119,27 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
     const isDirectorNameValid = Boolean(formData.directorName && formData.directorName.trim().length >= 2);
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isWorkEmailValid = Boolean(formData.workEmail && emailRegex.test(formData.workEmail.trim()));
+    const isEmailFormatValid = Boolean(formData.workEmail && emailRegex.test(formData.workEmail.trim()));
+    const isWorkEmailUnique = !isWorkEmailTaken(formData.workEmail);
+    const isWorkEmailValid = isEmailFormatValid && isWorkEmailUnique;
     const isEmailVerified = Boolean(formData.isEmailVerified);
     
     const digitsOnly = formData.workPhone ? formData.workPhone.replace(/\D/g, '') : '';
-    const isWorkPhoneValid = digitsOnly.length >= 6;
+    const isPhoneFormatValid = digitsOnly.length >= 6;
+    const isWorkPhoneUnique = !isPhoneTaken(formData.workPhone);
+    const isWorkPhoneValid = isPhoneFormatValid && isWorkPhoneUnique;
 
     const requiredFields = [
-      { name: "Nom de l'établissement", valid: isSchoolNameValid },
+      { name: "Nom de l'établissement (unique)", valid: isSchoolNameValid },
+      { name: "Sous-domaine dédié", valid: isSubdomainValid },
       { name: "Département", valid: isDepartmentValid },
       { name: "Ville", valid: isCityValid },
       { name: "Arrondissement / Quartier", valid: isArrondissementValid },
       { name: "Type d'établissement", valid: isSchoolTypeValid },
       { name: "Nom du responsable", valid: isDirectorNameValid },
-      { name: "E-mail professionnel", valid: isWorkEmailValid },
+      { name: "E-mail professionnel (unique)", valid: isWorkEmailValid },
       { name: "Vérification E-mail", valid: isEmailVerified },
-      { name: "Téléphone", valid: isWorkPhoneValid },
+      { name: "Téléphone (unique)", valid: isWorkPhoneValid },
     ];
 
     const completedCount = requiredFields.filter(f => f.valid).length;
@@ -128,21 +147,30 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
     const isAllValid = requiredFields.every(f => f.valid);
 
     return {
+      isSchoolNameLengthValid,
+      isSchoolNameUnique,
       isSchoolNameValid,
+      isSubdomainFormatValid,
+      isSubdomainUnique,
+      isSubdomainValid,
       isDepartmentValid,
       isCityValid,
       isArrondissementValid,
       isSchoolTypeValid,
       isDirectorNameValid,
+      isEmailFormatValid,
+      isWorkEmailUnique,
       isWorkEmailValid,
       isEmailVerified,
+      isPhoneFormatValid,
+      isWorkPhoneUnique,
       isWorkPhoneValid,
       requiredFields,
       completedCount,
       totalCount,
       isAllValid,
     };
-  }, [formData]);
+  }, [formData, suggestedSubdomain]);
 
   // Regenerate school code when department or format changes without auto-selecting city or arrondissement
   const handleDepartmentChange = (newDept: string) => {
@@ -289,8 +317,8 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
               isTouched={touchedFields.schoolName}
               showErrors={showErrors}
               value={formData.schoolName}
-              validLabel="Nom valide"
-              invalidLabel="Min. 3 car."
+              validLabel="Nom unique & valide"
+              invalidLabel={!fieldValidation.isSchoolNameUnique ? "Nom déjà pris" : "Min. 3 car."}
             />
           </div>
           <div className="relative">
@@ -325,8 +353,71 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             isTouched={touchedFields.schoolName}
             showErrors={showErrors}
             value={formData.schoolName}
-            errorMessage="Veuillez saisir le nom complet de l'établissement (minimum 3 caractères)."
-            successMessage="Nom d'établissement renseigné"
+            errorMessage={
+              !fieldValidation.isSchoolNameUnique
+                ? "Ce nom d'établissement est déjà enregistré sur EduCongo. Veuillez en saisir un autre."
+                : "Veuillez saisir le nom complet de l'établissement (minimum 3 caractères)."
+            }
+            successMessage="Nom d'établissement unique et disponible"
+          />
+        </div>
+
+        {/* Sous-domaine dédié de l'établissement (Exigence 1) */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-[12px] font-medium text-slate-300" htmlFor="subdomain">
+              Sous-domaine Web EduCongo <span className="text-rose-400">*</span>
+            </label>
+            <FormFieldBadge
+              isValid={fieldValidation.isSubdomainValid}
+              isTouched={touchedFields.subdomain}
+              showErrors={showErrors}
+              value={formData.subdomain || suggestedSubdomain}
+              validLabel="Sous-domaine disponible"
+              invalidLabel={!fieldValidation.isSubdomainUnique ? "Déjà réservé" : "Min. 3 car. (a-z, 0-9, -)"}
+            />
+          </div>
+          <div className="flex items-center">
+            <span className="inline-flex items-center px-3 py-2.5 rounded-l-xl border border-r-0 border-white/15 bg-white/[0.08] text-slate-400 text-[12px] font-mono select-none">
+              https://
+            </span>
+            <input
+              id="subdomain"
+              name="subdomain"
+              type="text"
+              required
+              value={formData.subdomain ?? suggestedSubdomain}
+              onFocus={() => markTouched('subdomain')}
+              onChange={(e) => {
+                markTouched('subdomain');
+                const cleanSlug = e.target.value
+                  .toLowerCase()
+                  .replace(/[^a-z0-9-]/g, '')
+                  .slice(0, 35);
+                onChange('subdomain', cleanSlug);
+              }}
+              placeholder="mon-ecole"
+              className={`w-full py-2.5 px-3 border border-white/15 bg-white/[0.05] text-emerald-300 font-mono font-bold text-[13px] outline-none transition-all ${
+                (touchedFields.subdomain || showErrors) && !fieldValidation.isSubdomainValid
+                  ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
+                  : 'focus:border-emerald-400'
+              }`}
+            />
+            <span className="inline-flex items-center px-3 py-2.5 rounded-r-xl border border-l-0 border-white/15 bg-white/[0.08] text-emerald-400 text-[12px] font-mono font-semibold select-none">
+              .educongo.cg
+            </span>
+          </div>
+          <FormFieldFeedback
+            isValid={fieldValidation.isSubdomainValid}
+            isTouched={touchedFields.subdomain}
+            showErrors={showErrors}
+            value={formData.subdomain || suggestedSubdomain}
+            errorMessage={
+              !fieldValidation.isSubdomainUnique
+                ? "Ce sous-domaine est déjà réservé par un autre établissement."
+                : "Sous-domaine requis (lettres minuscules, chiffres et tirets uniquement)."
+            }
+            successMessage={`Adresse web : https://${formData.subdomain || suggestedSubdomain || 'ecole'}.educongo.cg`}
           />
         </div>
 
@@ -717,8 +808,12 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             isTouched={touchedFields.workEmail}
             showErrors={showErrors}
             value={formData.workEmail}
-            errorMessage="Veuillez saisir une adresse e-mail professionnelle valide."
-            successMessage={formData.isEmailVerified ? "Adresse e-mail confirmée" : "Format e-mail valide"}
+            errorMessage={
+              !fieldValidation.isWorkEmailUnique
+                ? "Cette adresse e-mail est déjà associée à un établissement enregistré."
+                : "Veuillez saisir une adresse e-mail professionnelle valide."
+            }
+            successMessage={formData.isEmailVerified ? "Adresse e-mail confirmée et unique" : "Format e-mail valide & disponible"}
           />
         </div>
 
@@ -740,8 +835,8 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
               isTouched={touchedFields.workPhone}
               showErrors={showErrors}
               value={formData.workPhone}
-              validLabel="Numéro valide"
-              invalidLabel="Min. 6 chiffres"
+              validLabel="Numéro valide & unique"
+              invalidLabel={!fieldValidation.isWorkPhoneUnique ? "Numéro déjà pris" : "Min. 6 chiffres"}
             />
           </div>
           <div className="flex">
@@ -768,8 +863,12 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
             isTouched={touchedFields.workPhone}
             showErrors={showErrors}
             value={formData.workPhone}
-            errorMessage="Numéro de contact requis (min. 6 chiffres)."
-            successMessage="Numéro de téléphone enregistré"
+            errorMessage={
+              !fieldValidation.isWorkPhoneUnique
+                ? "Ce numéro de téléphone est déjà associé à un établissement enregistré."
+                : "Numéro de contact requis (min. 6 chiffres)."
+            }
+            successMessage="Numéro de téléphone unique et enregistré"
           />
         </div>
 

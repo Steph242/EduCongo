@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { SchoolRegistrationData } from '../../types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { isWorkEmailTaken, isPhoneTaken } from '../../services/accountService';
 import { FormFieldBadge, FormFieldFeedback } from '../Common/FormFieldValidation';
 
 interface RegisterStep2Props {
@@ -31,16 +32,21 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
     const isAdminFullNameValid = Boolean(formData.adminFullName && formData.adminFullName.trim().length >= 2);
     const isAdminRoleValid = Boolean(formData.adminRole && formData.adminRole.trim().length > 0);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isPersonalEmailValid = Boolean(formData.personalEmail && emailRegex.test(formData.personalEmail.trim()));
+    const isPersonalEmailFormatValid = Boolean(formData.personalEmail && emailRegex.test(formData.personalEmail.trim()));
+    const isPersonalEmailUnique = !isWorkEmailTaken(formData.personalEmail);
+    const isPersonalEmailValid = isPersonalEmailFormatValid && isPersonalEmailUnique;
+
     const digitsOnly = formData.personalPhone ? formData.personalPhone.replace(/\D/g, '') : '';
-    const isPersonalPhoneValid = digitsOnly.length >= 6;
+    const isPersonalPhoneFormatValid = digitsOnly.length >= 6;
+    const isPersonalPhoneUnique = !isPhoneTaken(formData.personalPhone);
+    const isPersonalPhoneValid = isPersonalPhoneFormatValid && isPersonalPhoneUnique;
     const isPasswordValid = Boolean(formData.password && formData.password.length >= 4);
 
     const requiredFields = [
       { name: "Nom complet de l'administrateur", valid: isAdminFullNameValid },
       { name: "Fonction", valid: isAdminRoleValid },
-      { name: "E-mail personnel", valid: isPersonalEmailValid },
-      { name: "Téléphone personnel", valid: isPersonalPhoneValid },
+      { name: "E-mail personnel (unique)", valid: isPersonalEmailValid },
+      { name: "Téléphone personnel (unique)", valid: isPersonalPhoneValid },
       { name: "Mot de passe", valid: isPasswordValid },
     ];
 
@@ -51,7 +57,11 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
     return {
       isAdminFullNameValid,
       isAdminRoleValid,
+      isPersonalEmailFormatValid,
+      isPersonalEmailUnique,
       isPersonalEmailValid,
+      isPersonalPhoneFormatValid,
+      isPersonalPhoneUnique,
       isPersonalPhoneValid,
       isPasswordValid,
       requiredFields,
@@ -344,8 +354,12 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
             isTouched={touchedFields.personalEmail}
             showErrors={showErrors}
             value={formData.personalEmail}
-            errorMessage="Format d'e-mail personnel incorrect (ex: nom@gmail.com)."
-            successMessage="Format d'e-mail de secours valide"
+            errorMessage={
+              !fieldValidation.isPersonalEmailUnique
+                ? "Cette adresse e-mail est déjà associée à un compte administrateur enregistré."
+                : "Format d'e-mail personnel incorrect (ex: nom@gmail.com)."
+            }
+            successMessage="E-mail personnel unique et valide"
           />
         </div>
 
@@ -363,8 +377,8 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
               isTouched={touchedFields.personalPhone}
               showErrors={showErrors}
               value={formData.personalPhone}
-              validLabel="Numéro valide"
-              invalidLabel="Min. 6 chiffres"
+              validLabel="Numéro valide & unique"
+              invalidLabel={!fieldValidation.isPersonalPhoneUnique ? "Numéro déjà pris" : "Min. 6 chiffres"}
             />
           </div>
           <div className="relative">
@@ -385,20 +399,11 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
                 }}
                 placeholder="06 000 00 00"
                 className={`w-full rounded-r-xl border ${
-                  (touchedFields.personalPhone || showErrors) && !fieldValidation.isPersonalPhoneValid 
-                    ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400 ring-1 ring-rose-500/30' 
-                    : fieldValidation.isPersonalPhoneValid && formData.personalPhone
-                    ? 'border-emerald-400/40 bg-emerald-500/[0.04] focus:border-emerald-400 ring-1 ring-emerald-500/20'
+                  (touchedFields.personalPhone || showErrors) && !fieldValidation.isPersonalPhoneValid
+                    ? 'border-rose-400/70 bg-rose-500/10 focus:border-rose-400'
                     : 'border-white/15 bg-white/[0.05]'
-                } text-white focus:bg-white/[0.08] px-3.5 py-2.5 pr-10 text-[14px] transition-all outline-none backdrop-blur-md placeholder:text-slate-500`}
+                } text-white focus:bg-white/[0.08] px-3.5 py-2.5 text-[14px] outline-none backdrop-blur-md font-mono`}
               />
-            </div>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              {fieldValidation.isPersonalPhoneValid && formData.personalPhone ? (
-                <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
-              ) : (touchedFields.personalPhone || showErrors) && !fieldValidation.isPersonalPhoneValid ? (
-                <span className="material-symbols-outlined text-rose-400 text-[18px]">error</span>
-              ) : null}
             </div>
           </div>
           <FormFieldFeedback
@@ -406,8 +411,12 @@ export const RegisterStep2: React.FC<RegisterStep2Props> = ({
             isTouched={touchedFields.personalPhone}
             showErrors={showErrors}
             value={formData.personalPhone}
-            errorMessage="Numéro mobile personnel incomplet (au moins 6 chiffres)."
-            successMessage="Numéro mobile personnel valide (+242)"
+            errorMessage={
+              !fieldValidation.isPersonalPhoneUnique
+                ? "Ce numéro de téléphone est déjà associé à un autre compte administrateur."
+                : "Numéro de contact requis (min. 6 chiffres)."
+            }
+            successMessage="Numéro personnel unique et enregistré"
           />
         </div>
 

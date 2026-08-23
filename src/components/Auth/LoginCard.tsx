@@ -1,7 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FormFieldBadge, FormFieldFeedback } from '../Common/FormFieldValidation';
-import { verifySchoolLogin, getRegisteredAccounts } from '../../services/accountService';
-import { RegisteredSchoolAccount } from '../../types';
+import { verifySchoolLogin } from '../../services/accountService';
 
 interface LoginCardProps {
   onSwitchToRegister: () => void;
@@ -31,13 +30,6 @@ export const LoginCard: React.FC<LoginCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
-  const [registeredAccounts, setRegisteredAccounts] = useState<RegisteredSchoolAccount[]>([]);
-
-  // Load registered accounts on mount
-  useEffect(() => {
-    const list = getRegisteredAccounts();
-    setRegisteredAccounts(list);
-  }, []);
 
   const markTouched = (field: string) => {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
@@ -451,69 +443,19 @@ export const LoginCard: React.FC<LoginCardProps> = ({
         </button>
       </form>
 
-      {/* Accounts information footer */}
-      <div className="mt-7 pt-5 border-t border-white/10 space-y-4">
-        {registeredAccounts.length > 0 ? (
-          <div>
-            <p className="text-[12px] text-slate-400 font-medium mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-emerald-400">verified</span>
-                Comptes autorisés :
-              </span>
-              <span className="text-[11px] text-emerald-400/80">Accès Direct</span>
-            </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-              {registeredAccounts.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => {
-                    if (loginMode === 'phone') {
-                      setPhone(acc.workPhone || acc.personalPhone);
-                    } else {
-                      setEmailOrCode(acc.workEmail || acc.schoolCode);
-                    }
-                    if (acc.password) {
-                      setPassword(acc.password);
-                    }
-                    setErrorMsg('');
-                    setShowErrors(false);
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl border border-white/10 hover:border-emerald-400/40 bg-white/[0.03] hover:bg-white/[0.07] text-[12px] transition-all group backdrop-blur-md cursor-pointer flex items-center justify-between"
-                >
-                  <div className="truncate mr-2">
-                    <div className="font-semibold text-slate-200 group-hover:text-emerald-300 transition-colors truncate">
-                      {acc.schoolName}
-                    </div>
-                    <div className="text-slate-400 text-[11px] truncate">
-                      {acc.adminFullName || acc.directorName} • {acc.workEmail}
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 shrink-0">
-                    Sélectionner
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10 text-slate-400 text-[12px] flex items-start gap-2.5">
-            <span className="material-symbols-outlined text-indigo-400 text-[18px] shrink-0 mt-0.5">how_to_reg</span>
-            <div>
-              <span className="text-slate-300 font-semibold block mb-0.5">Aucun compte actif trouvé</span>
-              <span>
-                Pour accéder au portail EduCongo, vous devez d'abord{' '}
-                <button
-                  type="button"
-                  onClick={onSwitchToRegister}
-                  className="text-emerald-400 font-semibold hover:underline cursor-pointer inline"
-                >
-                  enregistrer votre établissement
-                </button>.
-              </span>
-            </div>
-          </div>
-        )}
+      {/* Footer switch to register */}
+      <div className="mt-6 pt-5 border-t border-white/10 text-center">
+        <p className="text-[12.5px] text-slate-400">
+          Votre établissement n'est pas encore inscrit ?{' '}
+          <button
+            type="button"
+            onClick={onSwitchToRegister}
+            className="text-emerald-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-0.5"
+          >
+            Créer un compte
+            <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+          </button>
+        </p>
       </div>
     </div>
   );

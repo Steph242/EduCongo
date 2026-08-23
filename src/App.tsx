@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthViewMode, AppScreen, SchoolRegistrationData, SystemNotification, Student, StaffAccount, AdminDocument } from './types';
 import { supabase } from './lib/supabase';
 import { getRegisteredAccounts, saveRegisteredAccount, verifySchoolLogin, markAccountEmailVerified } from './services/accountService';
@@ -52,27 +52,79 @@ const EMPTY_REGISTRATION_DATA: SchoolRegistrationData = {
   },
 };
 
+// Session persistence helpers
+const getSavedSession = () => {
+  try {
+    const raw = localStorage.getItem('educongo_active_session_v3');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+};
+
 export function App() {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('auth');
+  const savedSession = useMemo(() => getSavedSession(), []);
+
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    if (savedSession?.isLoggedIn && savedSession?.currentScreen) {
+      return savedSession.currentScreen;
+    }
+    return 'auth';
+  });
   const [authMode, setAuthMode] = useState<AuthViewMode>('login');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return Boolean(savedSession?.isLoggedIn);
+  });
 
   // Active school data (for dashboard and forms)
-  const [currentSchool, setCurrentSchool] = useState({
-    name: '',
-    city: '',
-    code: '',
-    slogan: 'Discipline - Travail - Succès',
-    logoUrl: '',
-    subdomain: '',
+  const [currentSchool, setCurrentSchool] = useState(() => {
+    if (savedSession?.currentSchool?.name) {
+      return savedSession.currentSchool;
+    }
+    return {
+      name: '',
+      city: '',
+      code: '',
+      slogan: 'Discipline - Travail - Succès',
+      logoUrl: '',
+      subdomain: '',
+    };
   });
 
   // Global search navigation & selected items
   const [selectedDocForViewer, setSelectedDocForViewer] = useState<AdminDocument | null>(null);
   const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
   const [selectedStaffForCard, setSelectedStaffForCard] = useState<StaffAccount | null>(null);
-  const [dashboardTab, setDashboardTab] = useState<'overview' | 'attendance' | 'students' | 'bulletins' | 'finance' | 'staff' | 'certificates' | 'social'>('overview');
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'attendance' | 'students' | 'bulletins' | 'finance' | 'staff' | 'certificates' | 'social'>(() => {
+    return savedSession?.dashboardTab || 'overview';
+  });
   const [dashboardStudent, setDashboardStudent] = useState<Student | null>(null);
+
+  // Modals visibility
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
+  const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(() => {
+    return Boolean(savedSession?.isDevAuthenticated);
+  });
+
+  // Save active session to localStorage whenever state changes
+  useEffect(() => {
+    if (isLoggedIn && (currentScreen === 'dashboard' || currentScreen === 'dev_panel' || currentScreen === 'subdomain_portal')) {
+      try {
+        localStorage.setItem(
+          'educongo_active_session_v3',
+          JSON.stringify({
+            isLoggedIn: true,
+            currentScreen,
+            isDevAuthenticated,
+            currentSchool,
+            dashboardTab,
+          })
+        );
+      } catch {}
+    }
+  }, [isLoggedIn, currentScreen, isDevAuthenticated, currentSchool, dashboardTab]);
 
   // Simulated notifications system hook
   const {
@@ -241,13 +293,6 @@ export function App() {
       subscription.unsubscribe();
     };
   }, []);
-
-  // Modals visibility
-  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
-  const [isDevAuthenticated, setIsDevAuthenticated] = useState(false);
 
   const handleOpenDevPanel = () => {
     if (isDevAuthenticated) {
@@ -624,11 +669,14 @@ export function App() {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('educongo_active_session_v3');
+      sessionStorage.clear();
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Supabase signOut error:', err);
     }
     setIsLoggedIn(false);
+    setIsDevAuthenticated(false);
     setCurrentScreen('auth');
     setAuthMode('login');
   };

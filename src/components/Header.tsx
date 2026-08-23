@@ -106,14 +106,18 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Global Search Bar (Centralized & Fast) */}
-        <div className="flex-1 max-w-[200px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2">
-          <GlobalSearchBar
-            onSelectStudent={onSelectStudent}
-            onSelectStaff={onSelectStaff}
-            onSelectDocument={onSelectDocument}
-          />
-        </div>
+        {/* Global Search Bar (Centralized & Fast) - Only visible when logged in */}
+        {isLoggedIn ? (
+          <div className="flex-1 max-w-[200px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2">
+            <GlobalSearchBar
+              onSelectStudent={onSelectStudent}
+              onSelectStaff={onSelectStaff}
+              onSelectDocument={onSelectDocument}
+            />
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {/* Navigation / Links / Theme Switcher */}
         <nav className="flex items-center gap-1.5 sm:gap-2.5">
@@ -159,25 +163,29 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action: Notifications + Network Connectivity Indicator + User / Portal Button */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Simulated System Notifications Center */}
-          <NotificationCenter
-            notifications={notifications}
-            unreadCount={unreadCount}
-            onMarkAsRead={onMarkAsRead}
-            onMarkAllAsRead={onMarkAllAsRead}
-            onDelete={onDeleteNotification}
-            onClearAll={onClearAllNotifications}
-            onResetDefault={onResetDefaultNotifications}
-            onTriggerSimulation={onTriggerSimulation}
-            onSelectNotification={onSelectNotification}
-            isAutoSimulate={isAutoSimulate}
-            onToggleAutoSimulate={onToggleAutoSimulate}
-            soundEnabled={soundEnabled}
-            onToggleSound={onToggleSound}
-          />
+          {/* System Notifications Center - Only displayed when logged in */}
+          {isLoggedIn && (
+            <>
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={onMarkAsRead}
+                onMarkAllAsRead={onMarkAllAsRead}
+                onDelete={onDeleteNotification}
+                onClearAll={onClearAllNotifications}
+                onResetDefault={onResetDefaultNotifications}
+                onTriggerSimulation={onTriggerSimulation}
+                onSelectNotification={onSelectNotification}
+                isAutoSimulate={isAutoSimulate}
+                onToggleAutoSimulate={onToggleAutoSimulate}
+                soundEnabled={soundEnabled}
+                onToggleSound={onToggleSound}
+              />
 
-          {/* Connectivity Status Pill */}
-          <ConnectivityIndicator compact={false} />
+              {/* Connectivity Status Pill */}
+              <ConnectivityIndicator compact={false} />
+            </>
+          )}
 
           {isLoggedIn ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
