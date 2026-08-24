@@ -611,7 +611,7 @@ export function verifySchoolLogin(
   }
 
   // Verify school status (Requirement 3)
-  if (matchedAccount.status === 'Désactivé' || matchedAccount.status === 'Inactif') {
+  if (matchedAccount.status === 'Désactivé' || (matchedAccount.status as string) === 'Inactif') {
     return {
       success: false,
       error: 'ACCOUNT_NOT_FOUND',

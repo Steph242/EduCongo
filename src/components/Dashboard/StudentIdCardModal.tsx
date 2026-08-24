@@ -54,7 +54,7 @@ export const StudentIdCardModal: React.FC<StudentIdCardModalProps> = ({
         dateNaissance: student.birthDate,
         statutEcolage: student.tuitionPaid >= student.tuitionTotal ? 'Solvable' : 'En cours',
         contactUrgence: student.parentPhone,
-        validationUrl: `https://educongo.cg/verify/student/${student.matricule}`,
+        validationUrl: `https://${student.matricule.toLowerCase()}.edu-congo.netlify.app/verify`,
       });
 
       QRCode.toDataURL(verificationPayload, {
@@ -73,7 +73,7 @@ export const StudentIdCardModal: React.FC<StudentIdCardModalProps> = ({
   if (!isOpen || !student) return null;
 
   const handleCopyLink = () => {
-    const link = `https://educongo.cg/verify/student/${student.matricule}`;
+    const link = `https://${student.matricule.toLowerCase()}.edu-congo.netlify.app/verify`;
     navigator.clipboard?.writeText(link);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -398,7 +398,7 @@ export const StudentIdCardModal: React.FC<StudentIdCardModalProps> = ({
           <div className="flex items-center gap-2 text-slate-300 text-[11px] truncate">
             <span className="material-symbols-outlined text-emerald-400 text-[16px]">link</span>
             <span className="text-slate-400">Lien public de vérification :</span>
-            <span className="font-mono text-indigo-300 truncate">https://educongo.cg/verify/student/{student.matricule}</span>
+            <span className="font-mono text-indigo-300 truncate">https://{student.matricule.toLowerCase()}.edu-congo.netlify.app/verify</span>
           </div>
 
           <button

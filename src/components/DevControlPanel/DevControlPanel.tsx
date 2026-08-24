@@ -313,8 +313,8 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
       directorName: newSchoolForm.directorName || 'Directeur Général',
       adminFullName: newSchoolForm.directorName || 'Directeur Général',
       adminRole: 'proviseur',
-      workEmail: newSchoolForm.workEmail || `contact@${newSchoolForm.schoolCode.toLowerCase()}.educongo.cg`,
-      personalEmail: 'admin@educongo.cg',
+      workEmail: newSchoolForm.workEmail || `contact@${newSchoolForm.schoolCode.toLowerCase()}.edu-congo.netlify.app`,
+      personalEmail: 'admin@edu-congo.netlify.app',
       workPhone: newSchoolForm.workPhone,
       personalPhone: '+242 05 500 00 00',
       slogan: newSchoolForm.slogan || 'Discipline - Travail - Succès',
@@ -956,7 +956,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                   {devAccounts.filter((a) => a.isCustom === false).length}
                 </div>
                 <div className="text-[11px] text-purple-400 font-semibold mt-1">
-                  dev@educongo.cg & admin@educongo.cg
+                  dev@edu-congo.netlify.app & admin@edu-congo.netlify.app
                 </div>
               </div>
 
@@ -1892,7 +1892,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                   required
                   value={newDevForm.email}
                   onChange={(e) => setNewDevForm({ ...newDevForm, email: e.target.value })}
-                  placeholder="Ex: dev@educongo.cg ou admin@educongo.cg"
+                  placeholder="Ex: dev@edu-congo.netlify.app ou admin@edu-congo.netlify.app"
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none focus:border-indigo-400 font-mono"
                 />
               </div>

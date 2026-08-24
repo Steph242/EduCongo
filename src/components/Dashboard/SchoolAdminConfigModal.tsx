@@ -50,6 +50,8 @@ export const SchoolAdminConfigModal: React.FC<SchoolAdminConfigModalProps> = ({
   const [department, setDepartment] = useState(schoolAccount.department || 'Brazzaville');
   const [arrondissement, setArrondissement] = useState(schoolAccount.arrondissement || 'Centre');
   const [logoUrl, setLogoUrl] = useState(schoolAccount.logoUrl || '');
+  const [subdomain, setSubdomain] = useState(schoolAccount.subdomain || 'mon-ecole');
+  const [schoolType, setSchoolType] = useState(schoolAccount.schoolType || 'general');
   const [academicYear, setAcademicYear] = useState('2024 - 2025');
 
   // Cycles state
@@ -112,6 +114,14 @@ export const SchoolAdminConfigModal: React.FC<SchoolAdminConfigModalProps> = ({
   // Save General Profile
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanSubdomain = subdomain
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'mon-ecole';
+
     const updated = updateRegisteredAccount(schoolAccount.schoolCode, {
       schoolName,
       slogan,
@@ -123,6 +133,8 @@ export const SchoolAdminConfigModal: React.FC<SchoolAdminConfigModalProps> = ({
       department,
       arrondissement,
       logoUrl,
+      subdomain: cleanSubdomain,
+      schoolType,
     });
 
     saveSchoolData(schoolAccount.schoolCode, {
@@ -386,6 +398,40 @@ export const SchoolAdminConfigModal: React.FC<SchoolAdminConfigModalProps> = ({
                     placeholder="2024 - 2025"
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none font-mono"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Type d'Établissement</label>
+                  <select
+                    value={schoolType}
+                    onChange={(e) => setSchoolType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white outline-none focus:border-emerald-400"
+                  >
+                    <option value="general">Enseignement Général (Collège / Lycée)</option>
+                    <option value="technique">Enseignement Technique & Professionnel</option>
+                    <option value="primaire">Enseignement Primaire / Fondamental</option>
+                    <option value="universitaire">Institut / Enseignement Supérieur</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Adresse Web Personnalisée (Sous-domaine)
+                  </label>
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={subdomain}
+                      onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder="nom-etablissement"
+                      className="w-full px-3 py-2 rounded-l-xl bg-slate-900 border border-r-0 border-white/15 text-emerald-400 font-mono outline-none focus:border-emerald-400"
+                    />
+                    <div className="px-3 py-2 rounded-r-xl bg-white/[0.08] border border-white/15 text-slate-400 text-[11px] font-mono flex items-center select-none">
+                      .edu-congo.netlify.app
+                    </div>
+                  </div>
                 </div>
               </div>
 

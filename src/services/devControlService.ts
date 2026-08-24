@@ -253,8 +253,8 @@ export function deleteSchoolAccount(schoolId: string, adminActorName: string = '
 
 // Calculate national KPIs from schools list strictly with genuine real data
 export function calculateNationalStats(schools: RegisteredSchoolAccount[]): NationalEducationStats {
-  const activeCount = schools.filter((s) => s.status === 'Actif' || s.status === 'Validé').length;
-  const pendingCount = schools.filter((s) => s.status === 'En attente').length;
+  const activeCount = schools.filter((s) => s.status === 'Actif' || (s.status as string) === 'Validé').length;
+  const pendingCount = schools.filter((s) => (s.status as string) === 'En attente').length;
 
   const departments = new Set(schools.map((s) => s.department || 'Brazzaville'));
 

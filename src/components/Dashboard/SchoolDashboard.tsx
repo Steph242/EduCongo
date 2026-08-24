@@ -72,7 +72,7 @@ const DEFAULT_FALLBACK_STUDENT: Student = {
   parentName: 'Parent / Tuteur',
   parentPhone: '+242 06 000 00 00',
   photoUrl: STUDENT_PHOTO_PRESETS[0].url,
-  email: 'eleve@educongo.cg',
+  email: 'eleve@edu-congo.netlify.app',
   bloodGroup: 'O+',
   address: 'Brazzaville',
   status: 'Inscrit',
@@ -1295,7 +1295,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               parentName: 'Parent / Tuteur Légal',
               parentPhone: '06 650 00 00',
               photoUrl: STUDENT_PHOTO_PRESETS[0].url,
-              email: 'eleve@educongo.cg',
+              email: 'eleve@edu-congo.netlify.app',
               bloodGroup: 'O+',
               address: city || 'Brazzaville',
               status: 'Inscrit',
@@ -2873,7 +2873,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                     type="email"
                     value={newStudent.email}
                     onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                    placeholder="prenom.nom@educongo.cg"
+                    placeholder="prenom.nom@edu-congo.netlify.app"
                     className="w-full px-3 py-2 border border-white/15 rounded-xl text-xs bg-white/[0.05] text-white focus:border-emerald-400 outline-none backdrop-blur-md"
                   />
                 </div>
@@ -3260,7 +3260,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
               directorName: 'Directeur Général',
               adminFullName: 'Administrateur',
               workPhone: '+242 06 000 00 00',
-              workEmail: 'direction@educongo.cg',
+              workEmail: 'direction@edu-congo.netlify.app',
               schoolType: 'lycee',
               passwordHash: '',
               status: 'Actif',

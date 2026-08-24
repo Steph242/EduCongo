@@ -48,7 +48,7 @@ export const StaffAccessCardModal: React.FC<StaffAccessCardModalProps> = ({
         slogan: slogan,
         ville: city || 'Brazzaville',
         annee: '2024-2025',
-        validationUrl: `https://educongo.cg/verify/staff/${staff.matricule}`,
+        validationUrl: `https://${staff.matricule.toLowerCase()}.edu-congo.netlify.app/verify`,
       });
 
       QRCode.toDataURL(payload, {

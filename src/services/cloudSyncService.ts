@@ -57,7 +57,7 @@ export async function syncAllCloudData(): Promise<{
             directorName: rs.director_name || '',
             adminFullName: rs.director_name || 'Admin',
             adminRole: 'Directeur / Proviseur',
-            workEmail: rs.work_email || `${code.toLowerCase()}@educongo.cg`,
+            workEmail: rs.work_email || `${code.toLowerCase()}@edu-congo.netlify.app`,
             personalEmail: '',
             workPhone: rs.work_phone || '',
             personalPhone: rs.personal_phone || '',

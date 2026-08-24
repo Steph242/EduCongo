@@ -229,7 +229,7 @@ export function verifyDeveloperCredentials(emailInput: string, passwordInput: st
 
   const allAccounts = getDeveloperAccounts();
   const matched = allAccounts.find(
-    (a) => a.email.toLowerCase() === cleanEmail || (a.email.startsWith('dev@') && cleanEmail === 'dev@educongo.cg')
+    (a) => a.email.toLowerCase() === cleanEmail || (a.email.startsWith('dev@') && (cleanEmail === 'dev@edu-congo.netlify.app' || cleanEmail === 'dev@educongo.cg'))
   );
 
   if (!matched) {

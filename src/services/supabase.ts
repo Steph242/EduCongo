@@ -604,7 +604,7 @@ export async function syncLocalSchoolsToSupabase(): Promise<{
       personal_phone: s.personalPhone || null,
       director_name: s.directorName,
       logo_url: s.logoUrl || null,
-      is_active: s.status === 'Actif' || s.status === 'Validé',
+      is_active: s.status === 'Actif' || (s.status as string) === 'Validé',
       status: s.status,
     }));
 
@@ -645,8 +645,8 @@ export {
 } from './devAccountService';
 
 export const DEV_ACCOUNT = {
-  email: 'dev@educongo.cg',
-  altEmail: 'admin@educongo.cg',
+  email: 'dev@edu-congo.netlify.app',
+  altEmail: 'admin@edu-congo.netlify.app',
   password: 'DevAdmin2024!',
   isVerified: true,
   name: 'Console Nationale EduCongo (MEPPSA)',

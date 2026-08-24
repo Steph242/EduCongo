@@ -17,26 +17,26 @@ export type CodeFormat = 'standard' | 'departement' | 'annee';
 
 export interface SchoolRegistrationData {
   schoolName: string;
-  codeFormat: CodeFormat;
+  codeFormat?: CodeFormat;
   schoolCode: string;
-  schoolType: SchoolType | '';
-  department: string;
-  city: string;
-  arrondissement: string;
-  directorName: string;
-  adminRole: string;
-  adminFullName: string;
+  schoolType?: SchoolType | '';
+  department?: string;
+  city?: string;
+  arrondissement?: string;
+  directorName?: string;
+  adminRole?: string;
+  adminFullName?: string;
   workEmail: string;
-  personalEmail: string;
-  workPhone: string;
-  personalPhone: string;
+  personalEmail?: string;
+  workPhone?: string;
+  personalPhone?: string;
   password?: string;
   slogan?: string;
   logoUrl?: string;
   subdomain?: string;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
-  documents: {
+  documents?: {
     agrementFile: string | null;
     statutsFile: string | null;
     identityFile: string | null;

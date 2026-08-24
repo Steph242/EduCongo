@@ -37,7 +37,7 @@ export const TeacherWorkspace: React.FC<TeacherWorkspaceProps> = ({
     name: 'Prof. Brice MABIALA',
     subject: 'Mathématiques & Sciences Physiques',
     phone: '06 650 11 22',
-    email: 'b.mabiala@educongo.cg',
+    email: 'b.mabiala@edu-congo.netlify.app',
     status: 'Actif',
     classroom: 'Terminale D & Première C',
   },

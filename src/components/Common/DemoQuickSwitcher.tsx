@@ -215,7 +215,7 @@ export const DemoQuickSwitcher: React.FC<DemoQuickSwitcherProps> = ({
                 <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between">
                   <div>
                     <div className="font-bold text-white text-xs">Portail Public & Réseau Social Scolaire</div>
-                    <div className="text-[11px] text-emerald-400 font-mono">https://lycee-excellence.educongo.cg</div>
+                    <div className="text-[11px] text-emerald-400 font-mono">https://lycee-excellence.edu-congo.netlify.app</div>
                   </div>
                   <button
                     type="button"

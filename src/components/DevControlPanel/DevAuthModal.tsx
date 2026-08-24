@@ -146,7 +146,7 @@ export const DevAuthModal: React.FC<DevAuthModalProps> = ({
   };
 
   const handleUseDemoCredentials = () => {
-    setEmail('dev@educongo.cg');
+    setEmail('dev@edu-congo.netlify.app');
     setPassword('DevAdmin2024!');
     setErrorMessage('');
   };
@@ -154,7 +154,7 @@ export const DevAuthModal: React.FC<DevAuthModalProps> = ({
   const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const res = await verifyEmailCode(email || 'dev@educongo.cg', verificationCode);
+    const res = await verifyEmailCode(email || 'dev@edu-congo.netlify.app', verificationCode);
     setIsLoading(false);
     if (res.success) {
       const acc = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase()) || accounts[0];
@@ -291,7 +291,7 @@ export const DevAuthModal: React.FC<DevAuthModalProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="dev@educongo.cg ou votre email"
+                    placeholder="dev@edu-congo.netlify.app ou votre email"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] text-white focus:border-indigo-400 outline-none backdrop-blur-md font-mono text-[13px]"
                   />
                 </div>
@@ -334,7 +334,7 @@ export const DevAuthModal: React.FC<DevAuthModalProps> = ({
                   className="w-full py-2 bg-white/[0.04] hover:bg-white/[0.08] text-indigo-300 rounded-xl border border-indigo-500/30 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[15px]">key</span>
-                  <span>Remplir les identifiants par défaut (dev@educongo.cg)</span>
+                  <span>Remplir les identifiants par défaut (dev@edu-congo.netlify.app)</span>
                 </button>
               </div>
 
@@ -451,7 +451,7 @@ export const DevAuthModal: React.FC<DevAuthModalProps> = ({
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="Ex: dev@educongo.cg ou brealyston007@gmail.com"
+                    placeholder="Ex: dev@edu-congo.netlify.app ou brealyston007@gmail.com"
                     className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] text-white focus:border-indigo-400 outline-none backdrop-blur-md font-mono text-[13px]"
                   />
                 </div>

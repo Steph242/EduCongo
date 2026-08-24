@@ -169,7 +169,7 @@ export const StaffModal: React.FC<StaffModalProps> = ({
       phone: phone.trim(),
       email:
         email.trim() ||
-        `${fullName.toLowerCase().replace(/\s+/g, '.')}@educongo.cg`,
+        `${fullName.toLowerCase().replace(/\s+/g, '.')}@edu-congo.netlify.app`,
       photoUrl: photoUrl.trim() || TEACHER_PHOTO_PRESETS[0].url,
       accessStatus,
       lastLogin: staffToEdit?.lastLogin || 'Jamais connecté',

@@ -244,7 +244,7 @@ export const EmailVerificationCard: React.FC<EmailVerificationCardProps> = ({
           <div className="flex justify-between items-center">
             <span className="text-slate-400 dark:text-slate-400 light:text-slate-500">Adresse e-mail :</span>
             <span className="font-mono font-bold text-emerald-300 dark:text-emerald-300 light:text-emerald-700 truncate max-w-[190px]">
-              {email || 'direction@educongo.cg'}
+              {email || 'direction@edu-congo.netlify.app'}
             </span>
           </div>
         </div>

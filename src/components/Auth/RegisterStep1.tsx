@@ -404,7 +404,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
               }`}
             />
             <span className="inline-flex items-center px-3 py-2.5 rounded-r-xl border border-l-0 border-white/15 bg-white/[0.08] text-emerald-400 text-[12px] font-mono font-semibold select-none">
-              .educongo.cg
+              .edu-congo.netlify.app
             </span>
           </div>
           <FormFieldFeedback
@@ -417,7 +417,7 @@ export const RegisterStep1: React.FC<RegisterStep1Props> = ({
                 ? "Ce sous-domaine est déjà réservé par un autre établissement."
                 : "Sous-domaine requis (lettres minuscules, chiffres et tirets uniquement)."
             }
-            successMessage={`Adresse web : https://${formData.subdomain || suggestedSubdomain || 'ecole'}.educongo.cg`}
+            successMessage={`Adresse web : https://${formData.subdomain || suggestedSubdomain || 'ecole'}.edu-congo.netlify.app`}
           />
         </div>
 
