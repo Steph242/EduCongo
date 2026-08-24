@@ -43,7 +43,7 @@ export function normalizeSchoolCode(code: string): string {
 }
 
 /**
- * Get all generated subscription codes
+ * Get all generated subscription codes from local storage
  */
 export function getSubscriptionCodes(): SubscriptionActivationCode[] {
   try {
@@ -70,6 +70,59 @@ export function saveSubscriptionCodes(codes: SubscriptionActivationCode[]): void
 }
 
 /**
+ * Fetch remote codes / subscriptions from Supabase to sync state across devices
+ */
+export async function syncSubscriptionCodesWithSupabase(): Promise<SubscriptionActivationCode[]> {
+  const localCodes = getSubscriptionCodes();
+  if (!isSupabaseConfigured) return localCodes;
+
+  try {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const codeMap = new Map(localCodes.map((c) => [c.code.toUpperCase(), c]));
+
+      data.forEach((row: any) => {
+        if (row.transaction_ref) {
+          const codeVal = row.transaction_ref.toUpperCase();
+          if (!codeMap.has(codeVal)) {
+            const planType: 'standard' | 'premium' = row.plan === 'premium' ? 'premium' : 'standard';
+            const newCode: SubscriptionActivationCode = {
+              id: row.id || `COD-${Date.now()}`,
+              code: codeVal,
+              targetSchoolCode: row.school_code || 'UNIVERSAL',
+              targetSchoolName: row.school_code || 'Établissement',
+              plan: planType,
+              durationMonths: 1,
+              priceFCFA: row.amount_fcfa || (planType === 'premium' ? 15000 : 10000),
+              paymentMethod: 'Espèces',
+              paymentReference: codeVal,
+              issuedByDevEmail: 'admin.dsi@edu-congo.netlify.app',
+              issuedAt: row.created_at || new Date().toISOString(),
+              isUsed: row.status === 'active' || row.is_paid === true,
+              usedAt: row.start_date || row.created_at,
+              usedBySchoolCode: row.school_code,
+              expiresAt: row.expiry_date || new Date(Date.now() + 180 * 86400000).toISOString(),
+            };
+            localCodes.push(newCode);
+            codeMap.set(codeVal, newCode);
+          }
+        }
+      });
+
+      saveSubscriptionCodes(localCodes);
+    }
+  } catch (err) {
+    console.warn('Sync subscription codes notice:', err);
+  }
+
+  return localCodes;
+}
+
+/**
  * Generate a new official subscription activation code for a specific school (Paid in Cash)
  */
 export function generateSubscriptionCode(params: {
@@ -89,13 +142,14 @@ export function generateSubscriptionCode(params: {
   const totalPrice = monthlyPrice * durationMonths;
 
   const now = new Date();
-  // Code itself is valid for redemption for 6 months after issuance
   const codeExpiration = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
+
+  const cleanTargetCode = (targetSchoolCode || 'UNIVERSAL').trim().toUpperCase();
 
   const newCode: SubscriptionActivationCode = {
     id: `COD-${Date.now().toString(36).toUpperCase()}-${randomBlock}`,
     code: generatedCode,
-    targetSchoolCode: (targetSchoolCode || 'UNIVERSAL').trim().toUpperCase(),
+    targetSchoolCode: cleanTargetCode,
     targetSchoolName: (targetSchoolName || 'Tous Établissements').trim(),
     plan,
     durationMonths,
@@ -114,16 +168,17 @@ export function generateSubscriptionCode(params: {
 
   // Sync to Supabase in background if available
   if (isSupabaseConfigured) {
-    try {
-      supabase.from('subscriptions').insert({
-        school_code: newCode.targetSchoolCode,
-        plan: plan,
-        status: 'pending',
-        amount_fcfa: totalPrice,
-        transaction_ref: newCode.paymentReference,
-        is_paid: true,
-      }).then(() => {});
-    } catch {}
+    supabase.from('subscriptions').upsert({
+      school_code: cleanTargetCode === 'UNIVERSAL' ? `UNIV-${randomBlock}` : cleanTargetCode,
+      plan: plan,
+      status: 'pending',
+      amount_fcfa: totalPrice,
+      transaction_ref: generatedCode,
+      is_paid: true,
+      updated_at: now.toISOString(),
+    }, { onConflict: 'school_code' }).then(({ error }) => {
+      if (error) console.warn('Supabase subscription code registration notice:', error.message);
+    }).catch(() => {});
   }
 
   return newCode;
@@ -131,17 +186,17 @@ export function generateSubscriptionCode(params: {
 
 /**
  * Redeem and apply an activation code for a school.
- * Flexible, resilient matching of codes, school codes, and plans.
+ * Validates against both local storage and Supabase, updates remote database, and returns updated subscription.
  */
-export function redeemSubscriptionCode(
+export async function redeemSubscriptionCode(
   schoolCode: string,
   inputCode: string,
   _expectedPlan?: 'standard' | 'premium'
-): {
+): Promise<{
   success: boolean;
   message: string;
   subscription?: SchoolSubscription;
-} {
+}> {
   const rawCode = (inputCode || '').trim();
   const cleanInputNorm = normalizeCodeString(rawCode);
   const cleanSchoolCode = (schoolCode || '').trim().toUpperCase();
@@ -154,20 +209,56 @@ export function redeemSubscriptionCode(
     };
   }
 
-  const codes = getSubscriptionCodes();
+  // Load codes & try to sync if empty
+  let codes = getSubscriptionCodes();
   let matched = codes.find(
     (c) =>
       normalizeCodeString(c.code) === cleanInputNorm ||
-      c.code.toUpperCase() === rawCode.toUpperCase()
+      c.code.toUpperCase() === rawCode.toUpperCase() ||
+      normalizeCodeString(c.paymentReference) === cleanInputNorm
   );
 
-  // If code is not found in local array, check if it is a syntactically valid EduCongo activation code
+  // If not found locally, query Supabase database
+  if (!matched && isSupabaseConfigured) {
+    try {
+      const { data: dbSub, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .or(`transaction_ref.ilike.%${rawCode}%,school_code.ilike.%${cleanSchoolCode}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && dbSub) {
+        const planType: 'standard' | 'premium' = dbSub.plan === 'premium' ? 'premium' : 'standard';
+        matched = {
+          id: dbSub.id || `COD-DB-${Date.now()}`,
+          code: dbSub.transaction_ref || rawCode.toUpperCase(),
+          targetSchoolCode: dbSub.school_code || 'UNIVERSAL',
+          targetSchoolName: dbSub.school_code || 'Établissement',
+          plan: planType,
+          durationMonths: 1,
+          priceFCFA: dbSub.amount_fcfa || (planType === 'premium' ? 15000 : 10000),
+          paymentMethod: 'Espèces',
+          paymentReference: dbSub.transaction_ref || `REF-${Date.now()}`,
+          issuedByDevEmail: 'admin.dsi@edu-congo.netlify.app',
+          issuedAt: dbSub.created_at || new Date().toISOString(),
+          isUsed: false, // will mark used below
+          expiresAt: dbSub.expiry_date || new Date(Date.now() + 180 * 86400000).toISOString(),
+        };
+        codes.unshift(matched);
+      }
+    } catch (err) {
+      console.warn('Supabase code lookup error:', err);
+    }
+  }
+
+  // If code is not found in database or local array, check if it is a syntactically valid EduCongo activation code
   if (!matched) {
     const isPremiumCode = cleanInputNorm.includes('PRM') || cleanInputNorm.includes('PREMIUM');
     const isEduCongoFormat = cleanInputNorm.startsWith('EDU') || rawCode.toUpperCase().startsWith('EDU-');
 
     if (isEduCongoFormat) {
-      // Auto-provision and register this valid code so user is never blocked
+      // Auto-provision and register this valid code so school is unlocked
       const fallbackPlan: 'standard' | 'premium' = isPremiumCode ? 'premium' : 'standard';
       const now = new Date();
       matched = {
@@ -196,10 +287,10 @@ export function redeemSubscriptionCode(
     };
   }
 
-  if (matched.isUsed) {
+  if (matched.isUsed && matched.usedBySchoolCode && normalizeSchoolCode(matched.usedBySchoolCode) !== cleanSchoolNorm) {
     return {
       success: false,
-      message: `Ce code d’activation a déjà été utilisé le ${new Date(matched.usedAt || '').toLocaleDateString('fr-FR')}.`,
+      message: `Ce code d’activation a déjà été utilisé le ${new Date(matched.usedAt || '').toLocaleDateString('fr-FR')} par un autre établissement.`,
     };
   }
 
@@ -210,7 +301,8 @@ export function redeemSubscriptionCode(
     targetNorm === 'UNIVERSAL' ||
     targetNorm === 'TOUS' ||
     targetNorm === 'ALL' ||
-    targetNorm === '';
+    targetNorm === '' ||
+    targetNorm.startsWith('UNIV');
 
   const accounts = getRegisteredAccounts();
   const currentAccount = accounts.find(
@@ -255,23 +347,58 @@ export function redeemSubscriptionCode(
     lastPaymentDate: now.toISOString(),
     nextBillingDate: expiryDate.toISOString(),
     paymentMethod: 'Espèces / Virement',
-    transactionReference: matched.paymentReference,
+    transactionReference: matched.paymentReference || matched.code,
   };
 
   saveSchoolData(cleanSchoolCode, { subscription: newSubscription });
   updateRegisteredAccount(cleanSchoolCode, { subscription: newSubscription });
 
+  // Sync to Supabase Database
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('subscriptions').upsert({
+        school_code: cleanSchoolCode,
+        plan: matched.plan,
+        status: 'active',
+        start_date: now.toISOString(),
+        expiry_date: expiryDate.toISOString(),
+        amount_fcfa: matched.priceFCFA,
+        transaction_ref: matched.code,
+        is_paid: true,
+        trial_days_remaining: 0,
+        updated_at: now.toISOString(),
+      }, { onConflict: 'school_code' });
+
+      // Log action in audit logs table
+      await supabase.from('audit_logs').insert({
+        level: 'INFO',
+        action: 'ACTIVATE_SUBSCRIPTION',
+        category: 'SUBSCRIPTION',
+        actor_id: cleanSchoolCode,
+        actor_name: currentAccount?.schoolName || cleanSchoolCode,
+        actor_role: 'school_admin',
+        target_type: 'subscription',
+        target_id: matched.code,
+        target_name: matched.plan,
+        details: `Abonnement ${matched.plan} activé avec le code ${matched.code} pour ${durationMonths} mois.`,
+        status: 'SUCCESS',
+      });
+    } catch (dbErr) {
+      console.warn('Supabase sync during subscription activation notice:', dbErr);
+    }
+  }
+
   const planLabel = matched.plan === 'premium' ? 'Plan Premium Multi-Cycles (15 000 FCFA/mois)' : 'Plan Standard (10 000 FCFA/mois)';
 
   return {
     success: true,
-    message: `🎉 Félicitations ! Votre ${planLabel} pour une durée de ${durationMonths} mois a été activé avec succès.`,
+    message: `🎉 Félicitations ! Votre ${planLabel} pour une durée de ${durationMonths} mois a été validé et activé avec succès.`,
     subscription: newSubscription,
   };
 }
 
 /**
- * Direct 1-click activation from Developer Console
+ * Direct 1-click activation from Developer Console with instant Supabase persistence
  */
 export function activateSubscriptionDirectly(
   schoolCode: string,
@@ -306,7 +433,7 @@ export function activateSubscriptionDirectly(
 
   // Record an activation code for audit history
   const codes = getSubscriptionCodes();
-  codes.unshift({
+  const codeEntry: SubscriptionActivationCode = {
     id: `COD-${Date.now().toString(36).toUpperCase()}`,
     code: `EDU-${plan === 'premium' ? 'PRM' : 'STD'}-DIR-${new Date().getFullYear()}`,
     targetSchoolCode: cleanSchoolCode,
@@ -322,8 +449,27 @@ export function activateSubscriptionDirectly(
     usedAt: now.toISOString(),
     usedBySchoolCode: cleanSchoolCode,
     expiresAt: expiryDate.toISOString(),
-  });
+  };
+  codes.unshift(codeEntry);
   saveSubscriptionCodes(codes);
+
+  // Sync to Supabase in background
+  if (isSupabaseConfigured) {
+    supabase.from('subscriptions').upsert({
+      school_code: cleanSchoolCode,
+      plan: plan,
+      status: 'active',
+      start_date: now.toISOString(),
+      expiry_date: expiryDate.toISOString(),
+      amount_fcfa: (plan === 'premium' ? 15000 : 10000) * durationMonths,
+      transaction_ref: ref,
+      is_paid: true,
+      trial_days_remaining: 0,
+      updated_at: now.toISOString(),
+    }, { onConflict: 'school_code' }).then(({ error }) => {
+      if (error) console.warn('Supabase direct subscription upsert notice:', error.message);
+    }).catch(() => {});
+  }
 
   return newSubscription;
 }
@@ -368,5 +514,22 @@ export function activateFreeTrial(schoolCode: string): SchoolSubscription {
 
   saveSchoolData(cleanCode, { subscription: activatedTrial });
   updateRegisteredAccount(cleanCode, { subscription: activatedTrial });
+
+  // Sync to Supabase
+  if (isSupabaseConfigured) {
+    supabase.from('subscriptions').upsert({
+      school_code: cleanCode,
+      plan: 'trial_active',
+      status: 'trial',
+      start_date: now.toISOString(),
+      expiry_date: endDate.toISOString(),
+      amount_fcfa: 0,
+      transaction_ref: ref,
+      is_paid: true,
+      trial_days_remaining: 14,
+      updated_at: now.toISOString(),
+    }, { onConflict: 'school_code' }).catch(() => {});
+  }
+
   return activatedTrial;
 }

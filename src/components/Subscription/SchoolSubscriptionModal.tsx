@@ -70,18 +70,19 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
     }
   };
 
-  const handleActivateTrial = () => {
+  const handleActivateTrial = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
       const newSub = activateFreeTrial(schoolCode);
       setCurrentSub(newSub);
       if (onSubscriptionUpdated) onSubscriptionUpdated(newSub);
       showToast("🎉 Période d'essai gratuite de 14 jours activée avec succès !");
-    }, 500);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleRedeemCode = (e: React.FormEvent) => {
+  const handleRedeemCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -93,9 +94,8 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
 
     setIsProcessing(true);
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      const res = redeemSubscriptionCode(schoolCode, trimmed, selectedPlan || undefined);
+    try {
+      const res = await redeemSubscriptionCode(schoolCode, trimmed, selectedPlan || undefined);
 
       if (res.success && res.subscription) {
         setCurrentSub(res.subscription);
@@ -119,7 +119,11 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
       } else {
         setErrorMessage(res.message || "Code d'activation invalide ou introuvable.");
       }
-    }, 600);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erreur lors de la validation du code.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handlePrintReceipt = () => {

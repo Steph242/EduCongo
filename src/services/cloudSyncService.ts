@@ -1,8 +1,8 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { getRegisteredAccounts, saveRegisteredAccountsList, getSchoolData, saveSchoolData, getDeletedSchoolCodes } from './accountService';
+import { getRegisteredAccounts, saveRegisteredAccountsList, getSchoolData, saveSchoolData, getDeletedSchoolCodes, updateRegisteredAccount } from './accountService';
 import { getDeveloperAccounts, saveDeveloperAccounts, DeveloperAccount } from './devAccountService';
-import { getSubscriptionCodes, saveSubscriptionCodes, SubscriptionActivationCode } from './subscriptionCodeService';
-import { SchoolStatus } from '../types';
+import { syncSubscriptionCodesWithSupabase } from './subscriptionCodeService';
+import { SchoolStatus, SchoolSubscription } from '../types';
 
 /**
  * CloudSyncService:
@@ -72,9 +72,10 @@ export async function syncAllCloudData(): Promise<{
             documents: { agrementFile: null, statutsFile: null, identityFile: null },
           });
         } else {
-          // Sync status from server
+          // Sync status and details from server
           if (rs.status) existing.status = normalizedStatus;
           if (rs.logo_url) existing.logoUrl = rs.logo_url;
+          if (rs.name) existing.schoolName = rs.name;
         }
       });
 
@@ -113,11 +114,60 @@ export async function syncAllCloudData(): Promise<{
       saveDeveloperAccounts(localDevs);
     }
 
+    // 3. Sync Subscriptions from Supabase
+    try {
+      const { data: remoteSubs, error: subsErr } = await supabase
+        .from('subscriptions')
+        .select('*');
+
+      if (!subsErr && Array.isArray(remoteSubs) && remoteSubs.length > 0) {
+        remoteSubs.forEach((rs: any) => {
+          const code = (rs.school_code || '').toUpperCase().trim();
+          if (!code || code.startsWith('UNIV-')) return;
+
+          const planType: 'standard' | 'premium' | 'trial_active' | 'trial_pending' =
+            rs.plan === 'premium' ? 'premium' :
+            rs.plan === 'standard' ? 'standard' :
+            rs.plan === 'trial_active' ? 'trial_active' :
+            'trial_pending';
+
+          const subObj: SchoolSubscription = {
+            plan: planType,
+            planName:
+              planType === 'premium' ? 'Plan Premium Multi-Cycles (15 000 FCFA / mois)' :
+              planType === 'standard' ? 'Plan Standard (10 000 FCFA / mois)' :
+              planType === 'trial_active' ? "Période d'Essai Gratuite (14 Jours)" :
+              "Essai Gratuit (En attente d'activation)",
+            status:
+              rs.status === 'active' ? 'active' :
+              rs.status === 'trial' ? 'trial' :
+              rs.status === 'expired' ? 'expired' :
+              'pending_payment',
+            membershipFeePaid: rs.is_paid ?? true,
+            membershipFeeAmount: 0,
+            monthlyFee: planType === 'premium' ? 15000 : 10000,
+            lastPaymentDate: rs.start_date || rs.created_at,
+            nextBillingDate: rs.expiry_date,
+            transactionReference: rs.transaction_ref || rs.id,
+            trialDaysRemaining: rs.trial_days_remaining ?? (planType === 'trial_active' ? 14 : undefined),
+          };
+
+          saveSchoolData(code, { subscription: subObj });
+          updateRegisteredAccount(code, { subscription: subObj });
+        });
+      }
+    } catch (subErr) {
+      console.warn('Subscription sync notice:', subErr);
+    }
+
+    // 4. Sync Activation Codes
+    await syncSubscriptionCodesWithSupabase().catch(() => {});
+
     return {
       success: true,
       schoolsCount: getRegisteredAccounts().length,
       devAccountsCount: getDeveloperAccounts().length,
-      message: 'Données synchronisées avec Supabase Cloud.',
+      message: 'Données & Abonnements synchronisés avec Supabase Cloud.',
     };
   } catch (err: any) {
     console.warn('Cloud sync error (fallback to local cache):', err);

@@ -48,7 +48,7 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
     }
   };
 
-  const handleDirectRedeem = (codeObj: SubscriptionActivationCode) => {
+  const handleDirectRedeem = async (codeObj: SubscriptionActivationCode) => {
     let targetCode = codeObj.targetSchoolCode;
 
     if (targetCode === 'UNIVERSAL') {
@@ -59,7 +59,7 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
       targetCode = chosen.trim().toUpperCase();
     }
 
-    const res = redeemSubscriptionCode(targetCode, codeObj.code);
+    const res = await redeemSubscriptionCode(targetCode, codeObj.code);
     if (res.success) {
       refreshCodes();
       showFeedback(`🎉 Code ${codeObj.code} appliqué avec succès à l'établissement ${targetCode} !`);

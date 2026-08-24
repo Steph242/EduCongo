@@ -357,9 +357,9 @@ export const GenerateSubscriptionCodeModal: React.FC<GenerateSubscriptionCodeMod
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (generatedCode) {
-                      const res = redeemSubscriptionCode(generatedCode.targetSchoolCode, generatedCode.code);
+                      const res = await redeemSubscriptionCode(generatedCode.targetSchoolCode, generatedCode.code);
                       if (res.success) {
                         alert(`🎉 Code ${generatedCode.code} activé avec succès pour ${generatedCode.targetSchoolName} !`);
                         onClose();
