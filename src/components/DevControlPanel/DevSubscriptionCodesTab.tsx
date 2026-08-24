@@ -4,6 +4,7 @@ import {
   SubscriptionActivationCode,
   getSubscriptionCodes,
   deleteSubscriptionCode,
+  redeemSubscriptionCode,
 } from '../../services/subscriptionCodeService';
 import { generatePrintableReportWindow } from '../../utils/exportUtils';
 
@@ -16,7 +17,7 @@ interface DevSubscriptionCodesTabProps {
 
 export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = ({
   schools,
-  currentDevEmail,
+  currentDevEmail: _currentDevEmail,
   onOpenGenerateModal,
   showFeedback,
 }) => {
@@ -33,7 +34,7 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
   const handleCopy = (codeText: string, id: string) => {
     navigator.clipboard.writeText(codeText);
     setCopiedId(id);
-    showFeedback(`Code ${codeText} copié !`);
+    showFeedback(`Code ${codeText} copié dans le presse-papier !`);
     setTimeout(() => setCopiedId(null), 2500);
   };
 
@@ -44,6 +45,26 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
         refreshCodes();
         showFeedback(`Code ${codeText} supprimé avec succès.`);
       }
+    }
+  };
+
+  const handleDirectRedeem = (codeObj: SubscriptionActivationCode) => {
+    let targetCode = codeObj.targetSchoolCode;
+
+    if (targetCode === 'UNIVERSAL') {
+      const chosen = window.prompt(
+        `Ce code est universel. Saisissez le code de l'établissement à activer (ex: ${schools[0]?.schoolCode || 'ECOLE-01'}) :`
+      );
+      if (!chosen) return;
+      targetCode = chosen.trim().toUpperCase();
+    }
+
+    const res = redeemSubscriptionCode(targetCode, codeObj.code);
+    if (res.success) {
+      refreshCodes();
+      showFeedback(`🎉 Code ${codeObj.code} appliqué avec succès à l'établissement ${targetCode} !`);
+    } else {
+      showFeedback(`❌ Échec : ${res.message}`);
     }
   };
 
@@ -78,8 +99,7 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
           <strong>Instructions d'activation pour l'administrateur scolaire :</strong><br/>
           1. Se connecter à l'espace d'administration EduCongo.<br/>
           2. Cliquer sur « Abonnement & Activation ».<br/>
-          3. Cliquer sur le bouton devant le <strong>${codeObj.plan === 'premium' ? 'Plan Premium' : 'Plan Standard'}</strong> pour ouvrir le champ de saisie.<br/>
-          4. Entrer le code d'activation ci-dessus et valider.
+          3. Saisir ou coller le code d'activation ci-dessus et valider.
         </div>
 
         <div style="text-align: right; margin-top: 30px;">
@@ -320,6 +340,17 @@ export const DevSubscriptionCodesTab: React.FC<DevSubscriptionCodesTabProps> = (
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {!c.isUsed && (
+                          <button
+                            type="button"
+                            onClick={() => handleDirectRedeem(c)}
+                            title="Activer et appliquer immédiatement ce code à l'établissement"
+                            className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">bolt</span>
+                            <span>Activer</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handlePrintSlip(c)}

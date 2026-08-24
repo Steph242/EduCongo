@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { RegisteredSchoolAccount } from '../../types';
-import { generateSubscriptionCode, SubscriptionActivationCode } from '../../services/subscriptionCodeService';
+import {
+  generateSubscriptionCode,
+  SubscriptionActivationCode,
+  redeemSubscriptionCode,
+} from '../../services/subscriptionCodeService';
 import { generatePrintableReportWindow } from '../../utils/exportUtils';
 
 interface GenerateSubscriptionCodeModalProps {
@@ -351,6 +355,25 @@ export const GenerateSubscriptionCodeModal: React.FC<GenerateSubscriptionCodeMod
               </button>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (generatedCode) {
+                      const res = redeemSubscriptionCode(generatedCode.targetSchoolCode, generatedCode.code);
+                      if (res.success) {
+                        alert(`🎉 Code ${generatedCode.code} activé avec succès pour ${generatedCode.targetSchoolName} !`);
+                        onClose();
+                      } else {
+                        alert(res.message);
+                      }
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:opacity-90 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.3)] cursor-pointer"
+                  title="Appliquer et activer immédiatement ce code sans saisie manuelle"
+                >
+                  <span className="material-symbols-outlined text-[16px]">bolt</span>
+                  <span>Activer Immédiatement</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleReset}

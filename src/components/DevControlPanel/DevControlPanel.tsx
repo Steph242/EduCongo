@@ -35,6 +35,7 @@ import {
 import {
   getSubscriptionCodes,
   SubscriptionActivationCode,
+  activateSubscriptionDirectly,
 } from '../../services/subscriptionCodeService';
 import { GenerateSubscriptionCodeModal } from './GenerateSubscriptionCodeModal';
 import { DevSubscriptionCodesTab } from './DevSubscriptionCodesTab';
@@ -853,7 +854,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center flex-wrap gap-1">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -866,15 +867,43 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                                     <span className="material-symbols-outlined text-[12px]">vpn_key</span>
                                     <span>Générer Code</span>
                                   </button>
-                                  {sub.plan !== 'trial_active' && sub.plan !== 'standard' && sub.plan !== 'premium' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      activateSubscriptionDirectly(s.schoolCode, 'standard', 1, currentDev.email);
+                                      refreshData();
+                                      setDevActionFeedback(`Plan Standard (10k) activé pour ${s.schoolName}`);
+                                      setTimeout(() => setDevActionFeedback(null), 4000);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 cursor-pointer"
+                                    title="Activer directement le Plan Standard (10 000 FCFA)"
+                                  >
+                                    + Standard
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      activateSubscriptionDirectly(s.schoolCode, 'premium', 1, currentDev.email);
+                                      refreshData();
+                                      setDevActionFeedback(`Plan Premium Multi-Cycles (15k) activé pour ${s.schoolName}`);
+                                      setTimeout(() => setDevActionFeedback(null), 4000);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/35 text-indigo-300 text-[10px] font-bold border border-indigo-500/30 cursor-pointer"
+                                    title="Activer directement le Plan Premium Multi-Cycles (15 000 FCFA)"
+                                  >
+                                    + Premium
+                                  </button>
+                                  {sub.plan !== 'trial_active' && (
                                     <button
                                       type="button"
                                       onClick={() => {
                                         activateSchoolTrial(s.schoolCode, 'Espèces / Virement', 'DEV-ACTIVATION-2500');
                                         refreshData();
+                                        setDevActionFeedback(`Essai 14 jours activé pour ${s.schoolName}`);
+                                        setTimeout(() => setDevActionFeedback(null), 4000);
                                       }}
                                       className="px-1.5 py-0.5 rounded bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-[10px] font-bold border border-teal-500/30 cursor-pointer"
-                                      title="Activer l'essai 14 jours (2500 FCFA)"
+                                      title="Activer l'essai 14 jours"
                                     >
                                       + Essai
                                     </button>

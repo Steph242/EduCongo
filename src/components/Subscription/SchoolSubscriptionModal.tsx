@@ -52,10 +52,22 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
   const handleSelectPlan = (plan: 'standard' | 'premium') => {
     setSelectedPlan(plan);
     setErrorMessage(null);
-    setInputCode('');
     setTimeout(() => {
       activationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
+  };
+
+  const handleInputChange = (val: string) => {
+    const uppercaseVal = val.toUpperCase();
+    setInputCode(uppercaseVal);
+    setErrorMessage(null);
+
+    // Auto-detect plan if code contains indicators
+    if (uppercaseVal.includes('PRM') || uppercaseVal.includes('PREMIUM')) {
+      setSelectedPlan('premium');
+    } else if (uppercaseVal.includes('STD') || uppercaseVal.includes('STANDARD')) {
+      setSelectedPlan('standard');
+    }
   };
 
   const handleActivateTrial = () => {
@@ -66,20 +78,16 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
       setCurrentSub(newSub);
       if (onSubscriptionUpdated) onSubscriptionUpdated(newSub);
       showToast("🎉 Période d'essai gratuite de 14 jours activée avec succès !");
-    }, 600);
+    }, 500);
   };
 
   const handleRedeemCode = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!selectedPlan) {
-      setErrorMessage("Veuillez d'abord sélectionner le plan d'abonnement souhaité (Standard ou Premium) ci-dessous.");
-      return;
-    }
-
-    if (!inputCode.trim()) {
-      setErrorMessage("Veuillez saisir votre code d'activation d'abonnement.");
+    const trimmed = inputCode.trim();
+    if (!trimmed) {
+      setErrorMessage("Veuillez saisir votre code officiel d'activation d'abonnement.");
       return;
     }
 
@@ -87,7 +95,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
 
     setTimeout(() => {
       setIsProcessing(false);
-      const res = redeemSubscriptionCode(schoolCode, inputCode, selectedPlan);
+      const res = redeemSubscriptionCode(schoolCode, trimmed, selectedPlan || undefined);
 
       if (res.success && res.subscription) {
         setCurrentSub(res.subscription);
@@ -100,7 +108,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
 
         setLastPaymentReceipt({
           ref: res.subscription.transactionReference || 'REF-CASH-ESP',
-          amount: (res.subscription.plan === 'premium' ? 15000 : 10000),
+          amount: res.subscription.plan === 'premium' ? 15000 : 10000,
           planName: res.subscription.planName,
           date: nowFormatted,
           expiresAt: expiryFormatted,
@@ -109,9 +117,9 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
         setInputCode('');
         showToast(res.message);
       } else {
-        setErrorMessage(res.message || "Code d'activation invalide.");
+        setErrorMessage(res.message || "Code d'activation invalide ou introuvable.");
       }
-    }, 800);
+    }, 600);
   };
 
   const handlePrintReceipt = () => {
@@ -201,7 +209,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
               {isPlanLocked && (
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1">
                   <span className="material-symbols-outlined text-[13px]">lock</span>
-                  Verrouillé jusqu'à expiration
+                  Actif
                 </span>
               )}
               {isTrialActive && (
@@ -235,16 +243,16 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
           )}
         </div>
 
-        {/* STEP 1: COMPARATIVE PLANS GRID WITH SELECTION BUTTONS */}
+        {/* COMPARATIVE PLANS GRID WITH SELECTION BUTTONS */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-500/30">1</span>
-                Étape 1 : Choisissez votre Plan d'Abonnement
+                Nos Formules d'Abonnement
               </h3>
               <p className="text-xs text-slate-400">
-                Cliquez sur le bouton de la formule souhaitée pour ouvrir le champ de saisie du code d'activation correspondant.
+                Sélectionnez votre formule ou saisissez directement votre code officiel d'activation ci-dessous.
               </p>
             </div>
           </div>
@@ -306,7 +314,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
                 <span className="material-symbols-outlined text-[16px]">
                   {selectedPlan === 'standard' ? 'check_circle' : 'radio_button_unchecked'}
                 </span>
-                <span>{selectedPlan === 'standard' ? 'Plan Standard Sélectionné' : 'Choisir & Activer le Plan Standard'}</span>
+                <span>{selectedPlan === 'standard' ? 'Plan Standard Sélectionné' : 'Choisir le Plan Standard'}</span>
               </button>
             </div>
 
@@ -365,77 +373,57 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
                 <span className="material-symbols-outlined text-[16px]">
                   {selectedPlan === 'premium' ? 'check_circle' : 'radio_button_unchecked'}
                 </span>
-                <span>{selectedPlan === 'premium' ? 'Plan Premium Sélectionné' : 'Choisir & Activer le Plan Premium'}</span>
+                <span>{selectedPlan === 'premium' ? 'Plan Premium Sélectionné' : 'Choisir le Plan Premium'}</span>
               </button>
             </div>
 
           </div>
         </div>
 
-        {/* STEP 2: CODE ACTIVATION INPUT SECTION */}
-        <div ref={activationFormRef} className={`p-5 rounded-3xl border transition-all ${
-          selectedPlan
-            ? 'bg-gradient-to-br from-slate-900 to-slate-950 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
-            : 'bg-white/[0.02] border-white/10 opacity-75'
-        }`}>
+        {/* CODE ACTIVATION INPUT SECTION */}
+        <div ref={activationFormRef} className="p-5 rounded-3xl border bg-gradient-to-br from-slate-900 to-slate-950 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20">
           
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs font-bold border border-amber-500/30">2</span>
               <h3 className="text-sm font-bold text-white">
-                Étape 2 : Saisir le Code d'Activation du Plan Choisi
+                Saisir ou Coller le Code d'Activation
               </h3>
             </div>
 
-            {selectedPlan ? (
+            {selectedPlan && (
               <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 border ${
                 selectedPlan === 'premium'
                   ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                   : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
               }`}>
                 <span className="material-symbols-outlined text-[14px]">done</span>
-                Plan sélectionné : {selectedPlan === 'premium' ? 'Premium (15 000 FCFA/m)' : 'Standard (10 000 FCFA/m)'}
-              </span>
-            ) : (
-              <span className="text-xs text-amber-400 font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                Sélectionnez un plan ci-dessus
+                Plan : {selectedPlan === 'premium' ? 'Premium (15 000 FCFA/m)' : 'Standard (10 000 FCFA/m)'}
               </span>
             )}
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed mb-4">
-            Après règlement de votre formule auprès du commercial ou du développeur, entrez ci-dessous le code officiel d'activation remis pour votre établissement.
+            Entrez ci-dessous le code officiel remis par le développeur ou votre responsable commercial EduCongo.
           </p>
 
           <form onSubmit={handleRedeemCode} className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Code d'Activation Officiel ({selectedPlan ? (selectedPlan === 'premium' ? 'Format EDU-PRM-...' : 'Format EDU-STD-...') : 'Sélectionnez un plan'}) :
+                Code d'Activation Officiel (Ex: <span className="font-mono text-amber-300">EDU-STD-...</span> ou <span className="font-mono text-indigo-300">EDU-PRM-...</span>) :
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
-                  disabled={!selectedPlan}
-                  placeholder={
-                    selectedPlan === 'premium'
-                      ? 'Ex: EDU-PRM-9X3F-2025'
-                      : selectedPlan === 'standard'
-                      ? 'Ex: EDU-STD-4B7K-2025'
-                      : 'Cliquez d\'abord sur « Choisir ce Plan » ci-dessus'
-                  }
+                  placeholder="Collez votre code d'activation ici (Ex: EDU-STD-9X3F-2025)"
                   value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                  className={`flex-1 px-4 py-3 bg-white/5 border rounded-2xl text-white font-mono text-sm uppercase placeholder:normal-case placeholder:text-slate-500 focus:outline-none transition-all ${
-                    !selectedPlan
-                      ? 'border-white/10 bg-slate-900/50 cursor-not-allowed opacity-60'
-                      : 'border-white/15 focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
-                  }`}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-white/5 border border-white/20 rounded-2xl text-white font-mono text-sm uppercase placeholder:normal-case placeholder:text-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all"
                 />
                 <button
                   type="submit"
-                  disabled={isProcessing || !selectedPlan}
-                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={isProcessing}
+                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[18px]">verified</span>
                   <span>{isProcessing ? 'Validation...' : 'Valider & Activer le Plan'}</span>
@@ -472,7 +460,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
         {/* Modal Footer */}
         <div className="pt-4 border-t border-white/10 flex items-center justify-between">
           <p className="text-[11px] text-slate-400">
-            Encaissements sécurisés en espèces certifiés par le Hub Central EduCongo.
+            Encaissements sécurisés certifiés par la Direction des Systèmes d'Information EduCongo.
           </p>
           <button
             type="button"
