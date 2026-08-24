@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppScreen, SystemNotification, NotificationCategory, Student, StaffAccount, AdminDocument } from '../types';
 import { ConnectivityIndicator } from './Header/ConnectivityIndicator';
+import { CloudSyncIndicator } from './Common/CloudSyncIndicator';
 import { NotificationCenter } from './Header/NotificationCenter';
 import { GlobalSearchBar } from './Header/GlobalSearchBar';
 import { ThemeToggle } from './Common/ThemeToggle';
@@ -182,7 +183,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onToggleSound={onToggleSound}
               />
 
-              {/* Connectivity Status Pill */}
+              {/* Connectivity & Cloud Sync Status Pills */}
+              <CloudSyncIndicator compact={false} />
               <ConnectivityIndicator compact={false} />
             </>
           )}

@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { getRegisteredAccounts, saveRegisteredAccountsList, getSchoolData, saveSchoolData } from './accountService';
+import { getRegisteredAccounts, saveRegisteredAccountsList, getSchoolData, saveSchoolData, getDeletedSchoolCodes } from './accountService';
 import { getDeveloperAccounts, saveDeveloperAccounts, DeveloperAccount } from './devAccountService';
 import { getSubscriptionCodes, saveSubscriptionCodes, SubscriptionActivationCode } from './subscriptionCodeService';
+import { SchoolStatus } from '../types';
 
 /**
  * CloudSyncService:
@@ -23,6 +24,8 @@ export async function syncAllCloudData(): Promise<{
   }
 
   try {
+    const deletedCodes = new Set(getDeletedSchoolCodes());
+
     // 1. Sync Schools
     const { data: remoteSchools, error: schoolsErr } = await supabase
       .from('schools')
@@ -34,7 +37,12 @@ export async function syncAllCloudData(): Promise<{
 
       remoteSchools.forEach((rs: any) => {
         const code = rs.code ? rs.code.toUpperCase() : '';
-        if (!code) return;
+        if (!code || deletedCodes.has(code)) return;
+
+        const normalizedStatus: SchoolStatus = 
+          rs.status === 'Suspendu' ? 'Suspendu' :
+          rs.status === 'Désactivé' || rs.status === 'Inactif' || rs.is_active === false ? 'Désactivé' :
+          'Actif';
 
         const existing = localMap.get(code);
         if (!existing) {
@@ -60,12 +68,12 @@ export async function syncAllCloudData(): Promise<{
             isEmailVerified: true,
             isPhoneVerified: true,
             registeredAt: rs.created_at || new Date().toISOString(),
-            status: (rs.status as any) || (rs.is_active ? 'Actif' : 'Désactivé'),
+            status: normalizedStatus,
             documents: { agrementFile: null, statutsFile: null, identityFile: null },
           });
         } else {
           // Sync status from server
-          if (rs.status) existing.status = rs.status;
+          if (rs.status) existing.status = normalizedStatus;
           if (rs.logo_url) existing.logoUrl = rs.logo_url;
         }
       });

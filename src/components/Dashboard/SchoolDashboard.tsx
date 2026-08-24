@@ -24,6 +24,7 @@ import { SchoolAdminConfigModal } from './SchoolAdminConfigModal';
 import { SchoolSubscriptionModal } from '../Subscription/SchoolSubscriptionModal';
 import { SubscriptionStatusBanner } from '../Subscription/SubscriptionStatusBanner';
 import { activateFreeTrial } from '../../services/subscriptionCodeService';
+import { CloudSyncIndicator } from '../Common/CloudSyncIndicator';
 import {
   exportSingleStudentBulletinCSV,
   exportClassGradeSheetCSV,
@@ -1156,27 +1157,32 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({
                 </nav>
               </div>
 
-              {/* History Quick Links if multiple tabs visited */}
-              {tabHistory.length > 1 && (
-                <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Consultés :</span>
-                  {tabHistory.slice(-2).map((histTab) => {
-                    const mod = NAVIGATION_MODULES.flatMap((g) => g.items).find((m) => m.id === histTab);
-                    if (!mod) return null;
-                    return (
-                      <button
-                        key={histTab}
-                        type="button"
-                        onClick={() => navigateToTab(histTab)}
-                        className="px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <span className="material-symbols-outlined text-[12px] text-emerald-400">{mod.icon}</span>
-                        {mod.shortLabel}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {/* Cloud Sync Status and History Links */}
+              <div className="flex items-center gap-3">
+                <CloudSyncIndicator compact={false} />
+
+                {/* History Quick Links if multiple tabs visited */}
+                {tabHistory.length > 1 && (
+                  <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Consultés :</span>
+                    {tabHistory.slice(-2).map((histTab) => {
+                      const mod = NAVIGATION_MODULES.flatMap((g) => g.items).find((m) => m.id === histTab);
+                      if (!mod) return null;
+                      return (
+                        <button
+                          key={histTab}
+                          type="button"
+                          onClick={() => navigateToTab(histTab)}
+                          className="px-2 py-0.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[12px] text-emerald-400">{mod.icon}</span>
+                          {mod.shortLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Title & Quick Actions Row */}

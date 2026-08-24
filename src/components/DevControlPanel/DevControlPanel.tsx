@@ -274,11 +274,9 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
     switch (status) {
       case 'Actif':
         return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-      case 'Validé':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
-      case 'En attente':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       case 'Suspendu':
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      case 'Désactivé':
         return 'bg-rose-500/20 text-rose-300 border-rose-500/40';
       default:
         return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
@@ -286,7 +284,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   };
 
   // Status changer handler
-  const handleStatusChange = (schoolId: string, newStatus: 'Actif' | 'En attente' | 'Validé' | 'Suspendu') => {
+  const handleStatusChange = (schoolId: string, newStatus: 'Actif' | 'Suspendu' | 'Désactivé') => {
     updateSchoolStatus(schoolId, newStatus);
     refreshData();
   };
@@ -669,9 +667,8 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                 >
                   <option value="all">Tous Statuts</option>
                   <option value="Actif">Actif</option>
-                  <option value="Validé">Validé</option>
-                  <option value="En attente">En attente</option>
                   <option value="Suspendu">Suspendu</option>
+                  <option value="Désactivé">Désactivé</option>
                 </select>
 
                 {/* Filter Type */}
@@ -867,9 +864,8 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                                 className={`px-2.5 py-1 rounded-full border text-[11px] font-bold outline-none cursor-pointer ${getStatusBadge(s.status)}`}
                               >
                                 <option value="Actif" className="bg-slate-900 text-emerald-400">Actif</option>
-                                <option value="Validé" className="bg-slate-900 text-blue-400">Validé</option>
-                                <option value="En attente" className="bg-slate-900 text-amber-400">En attente</option>
-                                <option value="Suspendu" className="bg-slate-900 text-rose-400">Suspendu</option>
+                                <option value="Suspendu" className="bg-slate-900 text-amber-400">Suspendu</option>
+                                <option value="Désactivé" className="bg-slate-900 text-rose-400">Désactivé</option>
                               </select>
                             </td>
 

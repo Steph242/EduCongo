@@ -856,15 +856,15 @@ export function App() {
             }}
           />
         ) : (
-          <div className="flex-1 flex flex-col justify-center items-center py-4 sm:py-8 px-4 sm:px-6">
-            <div className="w-full max-w-[1280px] mx-auto">
-              {/* Split Screen Auth Layout */}
-              <div className="flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-8 lg:gap-12 min-h-[580px]">
+          <div className="flex-1 flex flex-col justify-center items-center py-2 sm:py-6 px-3 sm:px-6">
+            <div className="w-full max-w-[1240px] mx-auto">
+              {/* Split Screen Auth Layout - Optimized for PC height & mobile */}
+              <div className="flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-6 lg:gap-8 min-h-[480px]">
                 {/* Left Photo & Branding Hero Banner */}
                 <LeftHeroPanel variant={authMode === 'login' ? 'login' : 'register'} />
 
                 {/* Right Form Card */}
-                <div className="w-full lg:w-1/2 flex items-center justify-center p-2 sm:p-4">
+                <div className="w-full lg:w-1/2 flex items-center justify-center p-1 sm:p-2">
                   {authMode === 'login' && (
                     <LoginCard
                       onSwitchToRegister={() => {

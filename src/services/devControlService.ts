@@ -167,10 +167,10 @@ export function addAuditLog(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): Aud
   return newEntry;
 }
 
-// Helper to update school status (Actif, En attente, Validé, Suspendu)
+// Helper to update school status (Actif, Suspendu, Désactivé)
 export function updateSchoolStatus(
   schoolId: string,
-  newStatus: 'Actif' | 'En attente' | 'Validé' | 'Suspendu',
+  newStatus: 'Actif' | 'Suspendu' | 'Désactivé',
   adminActorName: string = 'Super-Admin Développeur'
 ): RegisteredSchoolAccount | null {
   const schools = getRegisteredSchools();
@@ -180,13 +180,13 @@ export function updateSchoolStatus(
   const oldStatus = schools[index].status;
   const updatedSchool = {
     ...schools[index],
-    status: newStatus as any,
+    status: newStatus,
   };
   schools[index] = updatedSchool;
   saveRegisteredSchools(schools);
 
   addAuditLog({
-    level: newStatus === 'Suspendu' ? 'WARN' : 'SECURITY',
+    level: newStatus === 'Suspendu' ? 'WARN' : newStatus === 'Désactivé' ? 'SECURITY' : 'INFO',
     action: `Modification statut établissement : ${oldStatus} -> ${newStatus}`,
     category: 'SCHOOL_MGMT',
     actor: {
@@ -207,14 +207,27 @@ export function updateSchoolStatus(
   return updatedSchool;
 }
 
-// Helper to delete school
+// Helper to delete school definitively
 export function deleteSchoolAccount(schoolId: string, adminActorName: string = 'Super-Admin Développeur'): boolean {
   const schools = getRegisteredSchools();
   const target = schools.find((s) => s.id === schoolId || s.schoolCode === schoolId);
   if (!target) return false;
 
+  const codeToDelete = target.schoolCode;
+
+  // 1. Blacklist the school code so cloud sync never revives it
+  import('./accountService').then(({ recordDeletedSchoolCode }) => {
+    recordDeletedSchoolCode(codeToDelete);
+  });
+
+  // 2. Filter out locally
   const filtered = schools.filter((s) => s.id !== schoolId && s.schoolCode !== schoolId);
   saveRegisteredSchools(filtered);
+
+  // 3. Remove school operational data
+  try {
+    localStorage.removeItem(`educongo_school_data_prod_v3_${codeToDelete.toUpperCase().trim()}`);
+  } catch {}
 
   addAuditLog({
     level: 'WARN',
@@ -231,7 +244,7 @@ export function deleteSchoolAccount(schoolId: string, adminActorName: string = '
       id: target.id,
       name: target.schoolName,
     },
-    details: `L'établissement ${target.schoolName} (${target.schoolCode}) a été supprimé de la base de données centrale.`,
+    details: `L'établissement ${target.schoolName} (${target.schoolCode}) a été supprimé définitivement de la base de données centrale.`,
     status: 'WARNING',
   });
 
