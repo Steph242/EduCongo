@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { SchoolSubscription } from '../../types';
 import { getSchoolSubscription } from '../../services/accountService';
 import { redeemSubscriptionCode, activateFreeTrial } from '../../services/subscriptionCodeService';
@@ -24,6 +24,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
   showToast,
 }) => {
   const [currentSub, setCurrentSub] = useState<SchoolSubscription>(() => getSchoolSubscription(schoolCode));
+  const [selectedPlan, setSelectedPlan] = useState<'standard' | 'premium' | null>(null);
   const [inputCode, setInputCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,6 +36,8 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
     expiresAt?: string;
   } | null>(null);
 
+  const activationFormRef = useRef<HTMLDivElement | null>(null);
+
   if (!isOpen) return null;
 
   const isTrialActive = currentSub.plan === 'trial_active';
@@ -45,6 +48,15 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
 
   // Plan is locked if standard or premium or trial is active and not expired
   const isPlanLocked = (isStandard || isPremium) && !isExpired;
+
+  const handleSelectPlan = (plan: 'standard' | 'premium') => {
+    setSelectedPlan(plan);
+    setErrorMessage(null);
+    setInputCode('');
+    setTimeout(() => {
+      activationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+  };
 
   const handleActivateTrial = () => {
     setIsProcessing(true);
@@ -61,8 +73,13 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!selectedPlan) {
+      setErrorMessage("Veuillez d'abord sélectionner le plan d'abonnement souhaité (Standard ou Premium) ci-dessous.");
+      return;
+    }
+
     if (!inputCode.trim()) {
-      setErrorMessage("Veuillez saisir votre code d'activation.");
+      setErrorMessage("Veuillez saisir votre code d'activation d'abonnement.");
       return;
     }
 
@@ -70,7 +87,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
 
     setTimeout(() => {
       setIsProcessing(false);
-      const res = redeemSubscriptionCode(schoolCode, inputCode);
+      const res = redeemSubscriptionCode(schoolCode, inputCode, selectedPlan);
 
       if (res.success && res.subscription) {
         setCurrentSub(res.subscription);
@@ -171,7 +188,7 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
           </button>
         </div>
 
-        {/* Current Subscription Status Badge & Lock Notice */}
+        {/* Current Subscription Status Badge */}
         <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-1">
@@ -218,171 +235,244 @@ export const SchoolSubscriptionModal: React.FC<SchoolSubscriptionModalProps> = (
           )}
         </div>
 
-        {/* Plan Lock Warning Banner */}
-        {isPlanLocked && (
-          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-indigo-400 text-[20px]">info</span>
+        {/* STEP 1: COMPARATIVE PLANS GRID WITH SELECTION BUTTONS */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <strong>Règle de Gestion des Forfaits :</strong> Lorsqu'un plan d'abonnement est actif, il ne peut pas être remplacé avant sa date d'expiration. Vous pouvez uniquement saisir un code de renouvellement pour prolonger votre validité.
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold border border-emerald-500/30">1</span>
+                Étape 1 : Choisissez votre Plan d'Abonnement
+              </h3>
+              <p className="text-xs text-slate-400">
+                Cliquez sur le bouton de la formule souhaitée pour ouvrir le champ de saisie du code d'activation correspondant.
+              </p>
             </div>
           </div>
-        )}
 
-        {/* CODE ACTIVATION SECTION (Paiement Espèces via Développeur) */}
-        <div className="p-5 rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 border border-amber-500/30 space-y-4">
-          <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
-            <span className="material-symbols-outlined text-[20px]">vpn_key</span>
-            <span>Activer un Code d'Abonnement (Reçu après paiement en espèces)</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Plan Standard Card */}
+            <div className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              selectedPlan === 'standard'
+                ? 'bg-emerald-950/50 border-emerald-400 ring-2 ring-emerald-500/40 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+                : isStandard
+                ? 'bg-emerald-950/20 border-emerald-500/40'
+                : 'bg-white/[0.02] border-white/10 hover:border-emerald-500/30 hover:bg-white/[0.04]'
+            }`}>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                    STANDARD
+                  </span>
+                  {isStandard && (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">PLAN ACTUEL</span>
+                  )}
+                </div>
+                <div className="text-xl font-black text-white mb-1">
+                  10 000 FCFA <span className="text-xs font-normal text-slate-400">/ mois</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">
+                  Idéal pour les établissements à cycle unique ou gestion scolaire standard.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-300 mb-5">
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
+                    Gestion des élèves, classes & inscriptions
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
+                    Génération des Bulletins MEPPSA avec QR Code
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
+                    Encaissement en caisse & reçus scolaires
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
+                    Export des registres en CSV & PDF
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPlan('standard')}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  selectedPlan === 'standard'
+                    ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-emerald-300'
+                    : 'bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/30'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {selectedPlan === 'standard' ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+                <span>{selectedPlan === 'standard' ? 'Plan Standard Sélectionné' : 'Choisir & Activer le Plan Standard'}</span>
+              </button>
+            </div>
+
+            {/* Plan Premium Card */}
+            <div className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+              selectedPlan === 'premium'
+                ? 'bg-indigo-950/60 border-indigo-400 ring-2 ring-indigo-500/40 shadow-[0_0_25px_rgba(99,102,241,0.3)]'
+                : isPremium
+                ? 'bg-indigo-950/20 border-indigo-500/40'
+                : 'bg-white/[0.02] border-white/10 hover:border-indigo-500/30 hover:bg-white/[0.04]'
+            }`}>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/30">
+                    PREMIUM MULTI-CYCLES
+                  </span>
+                  {isPremium && (
+                    <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">PLAN ACTUEL</span>
+                  )}
+                </div>
+                <div className="text-xl font-black text-white mb-1">
+                  15 000 FCFA <span className="text-xs font-normal text-slate-400">/ mois</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">
+                  Tous cycles (Primaire, Collège, Lycée, Supérieur) en illimité + portail web.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-300 mb-5">
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
+                    Multi-cycles & Multi-filières simultanées
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
+                    Portail Élèves, Enseignants & Parents Dédié
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
+                    Cartes d'identité scolaires avec QR sécurisé
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
+                    Sauvegardes automatiques & assistance prioritaire
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSelectPlan('premium')}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  selectedPlan === 'premium'
+                    ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)] border border-indigo-300'
+                    : 'bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/30'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {selectedPlan === 'premium' ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+                <span>{selectedPlan === 'premium' ? 'Plan Premium Sélectionné' : 'Choisir & Activer le Plan Premium'}</span>
+              </button>
+            </div>
+
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Pour activer le <strong>Plan Standard</strong> ou le <strong>Plan Premium</strong>, effectuez votre règlement en espèces auprès de l'équipe commerciale / du développeur. Saisissez ensuite le code d'activation généré pour votre établissement ci-dessous.
+        </div>
+
+        {/* STEP 2: CODE ACTIVATION INPUT SECTION */}
+        <div ref={activationFormRef} className={`p-5 rounded-3xl border transition-all ${
+          selectedPlan
+            ? 'bg-gradient-to-br from-slate-900 to-slate-950 border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
+            : 'bg-white/[0.02] border-white/10 opacity-75'
+        }`}>
+          
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs font-bold border border-amber-500/30">2</span>
+              <h3 className="text-sm font-bold text-white">
+                Étape 2 : Saisir le Code d'Activation du Plan Choisi
+              </h3>
+            </div>
+
+            {selectedPlan ? (
+              <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 border ${
+                selectedPlan === 'premium'
+                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              }`}>
+                <span className="material-symbols-outlined text-[14px]">done</span>
+                Plan sélectionné : {selectedPlan === 'premium' ? 'Premium (15 000 FCFA/m)' : 'Standard (10 000 FCFA/m)'}
+              </span>
+            ) : (
+              <span className="text-xs text-amber-400 font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                Sélectionnez un plan ci-dessus
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed mb-4">
+            Après règlement de votre formule auprès du commercial ou du développeur, entrez ci-dessous le code officiel d'activation remis pour votre établissement.
           </p>
 
           <form onSubmit={handleRedeemCode} className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Code d'Activation Officiel EduCongo :
+                Code d'Activation Officiel ({selectedPlan ? (selectedPlan === 'premium' ? 'Format EDU-PRM-...' : 'Format EDU-STD-...') : 'Sélectionnez un plan'}) :
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
-                  placeholder="Ex: EDU-STD-9B4X-2025 ou EDU-PRM-7K2Z-2025"
+                  disabled={!selectedPlan}
+                  placeholder={
+                    selectedPlan === 'premium'
+                      ? 'Ex: EDU-PRM-9X3F-2025'
+                      : selectedPlan === 'standard'
+                      ? 'Ex: EDU-STD-4B7K-2025'
+                      : 'Cliquez d\'abord sur « Choisir ce Plan » ci-dessus'
+                  }
                   value={inputCode}
                   onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                  className="flex-1 px-4 py-3 bg-white/5 border border-white/15 rounded-2xl text-white font-mono text-sm uppercase placeholder:normal-case placeholder:text-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all"
+                  className={`flex-1 px-4 py-3 bg-white/5 border rounded-2xl text-white font-mono text-sm uppercase placeholder:normal-case placeholder:text-slate-500 focus:outline-none transition-all ${
+                    !selectedPlan
+                      ? 'border-white/10 bg-slate-900/50 cursor-not-allowed opacity-60'
+                      : 'border-white/15 focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
+                  }`}
                 />
                 <button
                   type="submit"
-                  disabled={isProcessing}
-                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={isProcessing || !selectedPlan}
+                  className="px-6 py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-[18px]">verified</span>
-                  <span>{isProcessing ? 'Validation...' : 'Valider le Code'}</span>
+                  <span>{isProcessing ? 'Validation...' : 'Valider & Activer le Plan'}</span>
                 </button>
               </div>
             </div>
 
             {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">error</span>
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 animate-in fade-in">
+                <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
                 <span>{errorMessage}</span>
               </div>
             )}
           </form>
 
           {lastPaymentReceipt && (
-            <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between flex-wrap gap-2 animate-in fade-in">
               <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                Dernier abonnement activé : {lastPaymentReceipt.planName}
+                Dernier abonnement activé : <strong>{lastPaymentReceipt.planName}</strong>
               </span>
               <button
                 type="button"
                 onClick={handlePrintReceipt}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[15px]">print</span>
-                <span>Imprimer la Quittance</span>
+                <span>Imprimer la Quittance Officielle</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* COMPARATIVE PLANS GRID */}
-        <div>
-          <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-3">
-            Grille des Formules Disponibles
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Plan Standard Card */}
-            <div className={`p-5 rounded-2xl border transition-all ${
-              isStandard
-                ? 'bg-emerald-950/40 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                : 'bg-white/[0.02] border-white/10'
-            }`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
-                  STANDARD
-                </span>
-                {isStandard && (
-                  <span className="text-[10px] font-bold text-emerald-400">PLAN ACTUEL</span>
-                )}
-              </div>
-              <div className="text-xl font-black text-white mb-1">
-                10 000 FCFA <span className="text-xs font-normal text-slate-400">/ mois</span>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">
-                Idéal pour les établissements à cycle unique ou gestion standard.
-              </p>
-              <ul className="space-y-2 text-xs text-slate-300 mb-4">
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
-                  Gestion complète des élèves & inscriptions
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
-                  Génération des Bulletins MEPPSA avec QR Code
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
-                  Encaissement en caisse & reçus scolaires
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-[16px]">check</span>
-                  Export des registres en CSV & PDF
-                </li>
-              </ul>
-            </div>
-
-            {/* Plan Premium Card */}
-            <div className={`p-5 rounded-2xl border transition-all ${
-              isPremium
-                ? 'bg-indigo-950/40 border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                : 'bg-white/[0.02] border-white/10'
-            }`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/30">
-                  PREMIUM MULTI-CYCLES
-                </span>
-                {isPremium && (
-                  <span className="text-[10px] font-bold text-indigo-400">PLAN ACTUEL</span>
-                )}
-              </div>
-              <div className="text-xl font-black text-white mb-1">
-                15 000 FCFA <span className="text-xs font-normal text-slate-400">/ mois</span>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">
-                Tous cycles confondus (Primaire, Collège, Lycée, Supérieur) en illimité.
-              </p>
-              <ul className="space-y-2 text-xs text-slate-300 mb-4">
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
-                  Multi-cycles & Multi-filières simultanées
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
-                  Portail Élèves, Enseignants & Parents Dédié
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
-                  Cartes d'identité scolaires avec QR sécurisé
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-400 text-[16px]">check</span>
-                  Assistance prioritaire & sauvegardes automatiques
-                </li>
-              </ul>
-            </div>
-
-          </div>
-        </div>
-
         {/* Modal Footer */}
         <div className="pt-4 border-t border-white/10 flex items-center justify-between">
           <p className="text-[11px] text-slate-400">
-            Paiements sécurisés en espèces certifiés par le Hub Central EduCongo.
+            Encaissements sécurisés en espèces certifiés par le Hub Central EduCongo.
           </p>
           <button
             type="button"

@@ -32,6 +32,12 @@ import {
   getCurrentDeveloperAccount,
   DeveloperAccount,
 } from '../../services/devAccountService';
+import {
+  getSubscriptionCodes,
+  SubscriptionActivationCode,
+} from '../../services/subscriptionCodeService';
+import { GenerateSubscriptionCodeModal } from './GenerateSubscriptionCodeModal';
+import { DevSubscriptionCodesTab } from './DevSubscriptionCodesTab';
 import { CONGO_DEPARTMENTS, CONGO_CITIES } from '../../data/mockData';
 import { ThemeToggle } from '../Common/ThemeToggle';
 
@@ -41,7 +47,7 @@ interface DevControlPanelProps {
   onGoHome: () => void;
 }
 
-type DevTab = 'schools' | 'dev_accounts' | 'audit' | 'microservices' | 'console' | 'broadcast' | 'sandbox';
+type DevTab = 'schools' | 'subscriptions' | 'dev_accounts' | 'audit' | 'microservices' | 'console' | 'broadcast' | 'sandbox';
 
 export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   onImpersonateSchool,
@@ -55,6 +61,9 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
   const [auditLogs, setAuditLogs] = useState(getAuditLogs);
   const [microservices, setMicroservices] = useState<MicroserviceHealth[]>(INITIAL_MICROSERVICES);
   const [featureFlags, setFeatureFlags] = useState<DeveloperFeatureFlag[]>(INITIAL_FEATURE_FLAGS);
+  const [subCodes, setSubCodes] = useState<SubscriptionActivationCode[]>(getSubscriptionCodes);
+  const [isGenerateSubCodeModalOpen, setIsGenerateSubCodeModalOpen] = useState(false);
+  const [preselectedSchoolCodeForSub, setPreselectedSchoolCodeForSub] = useState<string | undefined>(undefined);
 
   // Filters for dev accounts
   const [devSearchQuery, setDevSearchQuery] = useState('');
@@ -181,6 +190,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
     setAuditLogs(getAuditLogs());
     setDevAccounts(getDeveloperAccounts());
     setCurrentDev(getCurrentDeveloperAccount());
+    setSubCodes(getSubscriptionCodes());
   };
 
   // Filtered developer accounts
@@ -507,6 +517,20 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
 
           <ThemeToggle />
 
+          {/* Bouton Générer Code d'Abonnement Rapide */}
+          <button
+            type="button"
+            onClick={() => {
+              setPreselectedSchoolCodeForSub(undefined);
+              setIsGenerateSubCodeModalOpen(true);
+            }}
+            title="Générer un code officiel d'activation d'abonnement"
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-xs font-black transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] cursor-pointer active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">vpn_key</span>
+            <span>Générer Code Plan</span>
+          </button>
+
           {/* Déconnexion Button (Functional) */}
           <button
             type="button"
@@ -597,6 +621,7 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
         <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10 custom-scrollbar">
           {[
             { id: 'schools', label: 'Établissements Inscrits', icon: 'domain', count: schools.length },
+            { id: 'subscriptions', label: 'Codes d’Abonnement & Licences', icon: 'vpn_key', count: subCodes.length },
             { id: 'dev_accounts', label: 'Comptes Développeurs & Super-Admins', icon: 'admin_panel_settings', count: devAccounts.length },
             { id: 'audit', label: 'Journal d’Audit & Sécurité', icon: 'security', count: auditLogs.length },
             { id: 'microservices', label: 'Microservices & Passerelles', icon: 'hub', count: microservices.length },
@@ -829,6 +854,18 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                                 </div>
 
                                 <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPreselectedSchoolCodeForSub(s.schoolCode);
+                                      setIsGenerateSubCodeModalOpen(true);
+                                    }}
+                                    className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 text-[10px] font-bold border border-amber-500/30 cursor-pointer flex items-center gap-0.5"
+                                    title="Générer un code d'activation pour cet établissement"
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">vpn_key</span>
+                                    <span>Générer Code</span>
+                                  </button>
                                   {sub.plan !== 'trial_active' && sub.plan !== 'standard' && sub.plan !== 'premium' && (
                                     <button
                                       type="button"
@@ -836,23 +873,12 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
                                         activateSchoolTrial(s.schoolCode, 'Espèces / Virement', 'DEV-ACTIVATION-2500');
                                         refreshData();
                                       }}
-                                      className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/30 cursor-pointer"
+                                      className="px-1.5 py-0.5 rounded bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-[10px] font-bold border border-teal-500/30 cursor-pointer"
                                       title="Activer l'essai 14 jours (2500 FCFA)"
                                     >
-                                      + Essai 14J
+                                      + Essai
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      updateSchoolSubscriptionPlan(s.schoolCode, 'premium', 'Espèces / Virement', 'DEV-PREMIUM-15000');
-                                      refreshData();
-                                    }}
-                                    className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-[10px] font-bold border border-indigo-500/30 cursor-pointer"
-                                    title="Activer le plan Premium (15 000 FCFA)"
-                                  >
-                                    + Premium
-                                  </button>
                                 </div>
                               </div>
                             </td>
@@ -912,6 +938,22 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* ==================== TAB: SUBSCRIPTION CODES MANAGEMENT ==================== */}
+        {activeTab === 'subscriptions' && (
+          <DevSubscriptionCodesTab
+            schools={schools}
+            currentDevEmail={currentDev.email}
+            onOpenGenerateModal={(code) => {
+              setPreselectedSchoolCodeForSub(code);
+              setIsGenerateSubCodeModalOpen(true);
+            }}
+            showFeedback={(msg) => {
+              setDevActionFeedback(msg);
+              setTimeout(() => setDevActionFeedback(null), 4000);
+            }}
+          />
         )}
 
         {/* ==================== TAB: DEVELOPER ACCOUNTS MANAGEMENT ==================== */}
@@ -2010,6 +2052,25 @@ export const DevControlPanel: React.FC<DevControlPanelProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* ==================== MODAL: GENERATE SUBSCRIPTION CODE ==================== */}
+      {isGenerateSubCodeModalOpen && (
+        <GenerateSubscriptionCodeModal
+          isOpen={isGenerateSubCodeModalOpen}
+          onClose={() => {
+            setIsGenerateSubCodeModalOpen(false);
+            setPreselectedSchoolCodeForSub(undefined);
+          }}
+          schools={schools}
+          initialSchoolCode={preselectedSchoolCodeForSub}
+          currentDevEmail={currentDev.email}
+          onCodeGenerated={(newCode) => {
+            refreshData();
+            setDevActionFeedback(`Code ${newCode.code} généré avec succès pour ${newCode.targetSchoolName} !`);
+            setTimeout(() => setDevActionFeedback(null), 5000);
+          }}
+        />
       )}
 
       {/* ==================== MODAL: INSPECT SCHOOL ==================== */}

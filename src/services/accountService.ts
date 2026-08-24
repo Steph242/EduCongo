@@ -513,6 +513,8 @@ export async function saveRegisteredAccount(data: SchoolRegistrationData): Promi
   return newAccount;
 }
 
+export const registerSchoolAccount = saveRegisteredAccount;
+
 /**
  * Mark a school account as verified after Supabase email confirmation
  */

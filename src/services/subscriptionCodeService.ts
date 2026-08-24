@@ -114,7 +114,8 @@ export function generateSubscriptionCode(params: {
  */
 export function redeemSubscriptionCode(
   schoolCode: string,
-  inputCode: string
+  inputCode: string,
+  expectedPlan?: 'standard' | 'premium'
 ): {
   success: boolean;
   message: string;
@@ -136,7 +137,7 @@ export function redeemSubscriptionCode(
   if (!matched) {
     return {
       success: false,
-      message: 'Code d’activation invalide ou introuvable. Veuillez vérifier avec votre responsable ou le développeur.',
+      message: 'Code d’activation invalide ou introuvable. Veuillez vérifier avec votre responsable commercial ou le développeur.',
     };
   }
 
@@ -144,6 +145,16 @@ export function redeemSubscriptionCode(
     return {
       success: false,
       message: `Ce code d’activation a déjà été utilisé le ${new Date(matched.usedAt || '').toLocaleDateString('fr-FR')}.`,
+    };
+  }
+
+  // Check if code matches the chosen plan if explicitly chosen
+  if (expectedPlan && matched.plan !== expectedPlan) {
+    const chosenLabel = expectedPlan === 'premium' ? 'Plan Premium' : 'Plan Standard';
+    const codeLabel = matched.plan === 'premium' ? 'Plan Premium' : 'Plan Standard';
+    return {
+      success: false,
+      message: `Ce code est destiné au ${codeLabel}, or vous avez sélectionné le ${chosenLabel}. Veuillez choisir le plan correspondant ou vérifier votre code.`,
     };
   }
 
@@ -190,6 +201,19 @@ export function redeemSubscriptionCode(
     message: `🎉 Félicitations ! Votre ${matched.plan === 'premium' ? 'Plan Premium' : 'Plan Standard'} pour une durée de ${matched.durationMonths} mois a été activé avec succès.`,
     subscription: newSubscription,
   };
+}
+
+/**
+ * Delete / revoke an activation code by developer
+ */
+export function deleteSubscriptionCode(codeId: string): boolean {
+  const codes = getSubscriptionCodes();
+  const nextCodes = codes.filter((c) => c.id !== codeId && c.code !== codeId);
+  if (nextCodes.length !== codes.length) {
+    saveSubscriptionCodes(nextCodes);
+    return true;
+  }
+  return false;
 }
 
 /**

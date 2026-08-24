@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { FormFieldBadge, FormFieldFeedback } from '../Common/FormFieldValidation';
-import { saveRegisteredAccount } from '../../services/accountService';
+import { registerSchoolAccount } from '../../services/accountService';
 
 interface RegisterCardProps {
   onSwitchToLogin: () => void;
@@ -104,7 +104,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
       }
 
       // Local account creation fallback
-      const newAccount = await saveRegisteredAccount({
+      const newAccount = await registerSchoolAccount({
         schoolName: defaultSchoolName,
         schoolCode: generatedCode,
         adminFullName: cleanUsername,
@@ -113,10 +113,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
         schoolType: 'secondaire',
         city: 'Brazzaville',
         department: 'Brazzaville',
-        arrondissement: 'Centre',
-        directorName: cleanUsername,
-        adminRole: 'Directeur / Proviseur',
-        workPhone: '+242 06 000 00 00',
+        workPhone: '06 000 00 00',
         subdomain: cleanSubdomain,
         isEmailVerified: true,
       });
